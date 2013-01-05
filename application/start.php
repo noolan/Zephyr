@@ -171,3 +171,19 @@ if ( ! Request::cli() and Config::get('session.driver') !== '')
 {
 	Session::load();
 }
+
+/*
+|--------------------------------------------------------------------------
+| Start / Declare View Composers
+|--------------------------------------------------------------------------
+*/
+
+View::composer('bootstrap', function($view) {
+	Asset::add('bootstrap',            'lib/bootstrap/css/bootstrap.min.css');
+	Asset::add('bootstrap-responsive', 'lib/bootstrap/css/bootstrap-responsive.min.css', 'bootstrap');
+	Asset::add('bootstrap-js',         'lib/bootstrap/js/bootstrap.min.js', 'jquery');
+
+	Asset::add('jquery',       'lib/jquery/jquery-1.8.3.min.js');
+	Asset::add('jquery-ui',    'lib/jquery/jquery-ui-1.9.2.custom.min.css');
+	Asset::add('jquery-ui-js', 'lib/jquery/jquery-ui-1.9.2.custom.min.js');
+});
