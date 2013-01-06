@@ -185,5 +185,10 @@ View::composer('bootstrap', function($view) {
 
 	Asset::add('jquery',       'lib/jquery/jquery-1.8.3.min.js');
 	Asset::add('jquery-ui',    'lib/jquery/jquery-ui-1.9.2.custom.min.css');
-	Asset::add('jquery-ui-js', 'lib/jquery/jquery-ui-1.9.2.custom.min.js');
+	Asset::add('jquery-ui-js', 'lib/jquery/jquery-ui-1.9.2.custom.min.js', 'jquery');
+
+	if (!Auth::guest()) {
+		Asset::add('redactor',     'lib/redactor/redactor.min.js', 'jquery');
+		Asset::add('redactor-css', 'lib/redactor/redactor.css');
+	}
 });

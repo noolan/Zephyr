@@ -10,6 +10,32 @@ Route::get('/', function() {
 	return View::make('page')->with('title', 'Zephyr');
 });
 
+// Runs a task without needing to use the artisan CLI
+Route::get('task/(:any)/(:any?)', function($task, $method = null) {
+
+	Command::run(array($task . (is_null($method) ? '' : ':' . $method)));
+
+	return Response::make('Task successful');
+});
+
+Route::get('login', function() {
+	if(Auth::guest())
+		return View::make('login')->with('title', 'Zephyr/Login');
+	else
+		return Redirect::to('/');
+});
+
+Route::post('login', function() {
+	$credentials = array('username' => Input::get('email'), 'password' => Input::get('password'));
+
+	if (Auth::attempt($credentials))
+		return Redirect::to('/');
+
+	return View::make('login')->with('title', 'Zephyr/Login')
+							  						->with('alert', 'username or password not found')
+							  						->with('email', Input::get('email'));
+});
+
 /*
 |--------------------------------------------------------------------------
 | Application 404 & 500 Error Handlers
