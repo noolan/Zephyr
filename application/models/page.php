@@ -7,8 +7,12 @@ class Page extends Eloquent {
 		return $this->has_many('Content');
 	}
 
+	public function tag() {
+		return $this->belongs_to('Tag');
+	}
+
 	public function posts() {
-		//return
+		return $this->tag()->posts()->get();
 	}
 
 	public function get_content() {
@@ -17,6 +21,18 @@ class Page extends Eloquent {
 
 	public function set_content($content) {
 		$this->content()->insert(new Content(array('text' => $content)));
+	}
+
+	public function set_slug($slug) {
+		$this->set_attribute('slug', Str::slug($slug));
+	}
+
+	public static function home() {
+		return Page::order_by('order', 'asc')->first();
+	}
+
+	public static function links() {
+		return Page::order_by('order', 'asc')->get(array('slug', 'title'));
 	}
 
 	public static function create_schema() {

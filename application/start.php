@@ -191,4 +191,6 @@ View::composer('bootstrap', function($view) {
 		Asset::add('redactor',     'lib/redactor/redactor.min.js', 'jquery');
 		Asset::add('redactor-css', 'lib/redactor/redactor.css');
 	}
+
+	$view->links = Page::links();
 });

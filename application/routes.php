@@ -7,16 +7,9 @@
 */
 
 Route::get('/', function() {
-	return View::make('page')->with('title', 'Zephyr');
+	return Redirect::to(Page::home()->slug);
 });
 
-// Runs a task without needing to use the artisan CLI
-Route::get('task/(:any)/(:any?)', function($task, $method = null) {
-
-	Command::run(array($task . (is_null($method) ? '' : ':' . $method)));
-
-	return Response::make('Task successful');
-});
 
 Route::get('login', function() {
 	if(Auth::guest())
@@ -32,8 +25,24 @@ Route::post('login', function() {
 		return Redirect::to('/');
 
 	return View::make('login')->with('title', 'Zephyr/Login')
-							  						->with('alert', 'username or password not found')
-							  						->with('email', Input::get('email'));
+	                          ->with('alert', 'username or password not found')
+	                          ->with('email', Input::get('email'));
+});
+
+// Runs a task without needing to use the artisan CLI
+Route::get('task/(:any)/(:any?)', function($task, $method = null) {
+
+	Command::run(array($task . (is_null($method) ? '' : ':' . $method)));
+
+	return Response::make('Task successful');
+});
+
+Route::get('(:any)', function($slug) {
+	if (!($page = Page::where_slug($slug)->first()))
+		return Event::fire('404');
+	//Debug::out($page);
+	return View::make('page')->with('title', $page->title)
+	                         ->with('page', $page);
 });
 
 /*

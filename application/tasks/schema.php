@@ -37,7 +37,7 @@ class Schema_Task {
 		$page->slug = 'home';
 		$page->save();
 
-		$page->content->insert( new Content( array( 'text' => 'Put some content here.' ) ) );
+		$page->content()->insert( new Content( array( 'text' => 'Put some content here.' ) ) );
 
 
 	}
