@@ -40,7 +40,7 @@ Route::get('task/(:any)/(:any?)', function($task, $method = null) {
 Route::get('(:any)', function($slug) {
 	if (!($page = Page::where_slug($slug)->first()))
 		return Event::fire('404');
-	//Debug::out($page);
+	//Debug::out($page->content);
 	return View::make('page')->with('title', $page->title)
 	                         ->with('page', $page);
 });

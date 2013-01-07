@@ -15,12 +15,12 @@ class Page extends Eloquent {
 		return $this->tag()->posts()->get();
 	}
 
-	public function get_content() {
-		return $this->content()->order_by('created_at', 'desc')->first();
+	public function get_text() {
+		return $this->content()->order_by('created_at', 'desc')->first()->text;
 	}
 
 	public function set_content($content) {
-		$this->content()->insert(new Content(array('text' => $content)));
+		$this->contents()->insert(new Content(array('text' => $content)));
 	}
 
 	public function set_slug($slug) {
