@@ -4,11 +4,14 @@ use Illuminate\Auth\UserInterface;
 
 class User extends Eloquent implements UserInterface {
 
-	public static $table = 'users';
-	public static $hidden = array('password');
+	protected $table = 'users';
+	protected $hidden = array( 'password' );
+	protected $guarded = array( 'id', 'password' );
 
-	public function set_password($password) {
-		$this->set_attribute('hashed_password', Hash::make($password));
+	public $timestamps = false;
+
+	public function setPassword($password) {
+		$this->attributes['password'] = Hash::make($password);
 	}
 
 	public function getAuthIdentifier() {
@@ -16,7 +19,7 @@ class User extends Eloquent implements UserInterface {
 	}
 
 	public function getAuthPassword() {
-		return $this->hashed_password;
+		return $this->password;
 	}
 
 	public static function create_schema() {
@@ -28,8 +31,7 @@ class User extends Eloquent implements UserInterface {
 
 			$table->string('name');
 			$table->string('email')->index();
-			$table->string('hashed_password', 60);
-			$table->timestamps();
+			$table->string('password', 60);
 			
 		});
 	}
