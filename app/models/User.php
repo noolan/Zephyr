@@ -1,16 +1,16 @@
 <?php
 
 use Illuminate\Auth\UserInterface;
+use Illuminate\Auth\Reminders\RemindableInterface;
 
-class User extends Eloquent implements UserInterface {
+class User extends Eloquent implements UserInterface, RemindableInterface {
 
-	protected $table = 'users';
-	protected $hidden = array( 'password' );
+	protected $table   = 'users';
+	protected $hidden  = array('password');
 	protected $guarded = array( 'id', 'password' );
-
 	public $timestamps = false;
 
-	public function setPassword($password) {
+	public function setPasswordAttribute($password) {
 		$this->attributes['password'] = Hash::make($password);
 	}
 
@@ -22,18 +22,8 @@ class User extends Eloquent implements UserInterface {
 		return $this->password;
 	}
 
-	public static function create_schema() {
-		Schema::dropIfExists(static::$table);
-
-		Schema::create(static::$table, function($table) {
-			$table->engine = 'MyISAM';
-			$table->increments('id');
-
-			$table->string('name');
-			$table->string('email')->index();
-			$table->string('password', 60);
-			
-		});
+	public function getReminderEmail() {
+		return $this->email;
 	}
 
 }
