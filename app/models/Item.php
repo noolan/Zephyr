@@ -14,20 +14,6 @@ class Item extends Eloquent {
 		return $this->belongsTo('Stream');
 	}
 
-	public static function add($parameters) {
-		$item = Item::create(array(
-			'order' => $parameters['order']
-		));
-		foreach($parameters->revisions as $language => $revision) {
-			$item->update(array(
-				'language_id' => Language::$language(),
-				'name'        => $revision['name'],
-				'slug'        => $revision['slug'],
-				'content'     => $revision['content']
-			));
-		}
-	}
-
 	public function update($parameters) {
 		$this->revisions()->insert(new Revision($parameters));
 	}

@@ -13,13 +13,23 @@
 
 App::before(function($request)
 {
-	//
+
 });
 
 
 App::after(function($request, $response)
 {
-	//
+	$queries = DB::getQueryLog();
+	if (count($queries) > 0) {
+		//ChromePhp::log($queries);
+		$total_time = 0.0;
+		foreach($queries as $query) {
+			$total_time += $query['time'];
+			ChromePhp::log($query['query']);
+		}
+		ChromePhp::log('Total time: ' . $total_time);
+		ChromePhp::log('Queries: ' . count($queries));
+	}
 });
 
 /*
@@ -35,7 +45,10 @@ App::after(function($request, $response)
 
 Route::filter('auth', function()
 {
-	if (Auth::guest()) return Redirect::route('login');
+	if (Auth::guest()) {
+		Session::flash('route', Request::path());
+		return Redirect::to('login')->withInput(Input::except('password'));
+	}
 });
 
 
@@ -57,7 +70,7 @@ Route::filter('guest', function()
 
 Route::filter('csrf', function()
 {
-	if (Session::getToken() != Input::get('csrf_token'))
+	if (Session::getToken() != Input::get('_token'))
 	{
 		throw new Illuminate\Session\TokenMismatchException;
 	}
