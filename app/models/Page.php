@@ -1,13 +1,13 @@
 <?php
 
-class Content extends Eloquent {
+class Page extends Eloquent {
 
 	protected $table = 'pages';
 	protected $guarded = array('id');
 	public $timestamps = false;
 
 	public function revisions() {
-		return $this->hasMany('Revision');
+		return $this->morphMany('Revision', 'revised');
 	}
 
 	public static function links($language = 'english') {
@@ -25,8 +25,9 @@ class Content extends Eloquent {
 		$page = Page::create(array(
 			'order' => $parameters['order']
 		));
-		foreach($parameters->revisions as $language => $revision) {
-			$page->update(array(
+		//var_dump($parameters); die();
+		foreach($parameters['revisions'] as $language => $revision) {
+			$page->revise(array(
 				'language_id' => Language::$language(),
 				'name'        => $revision['name'],
 				'slug'        => $revision['slug'],
@@ -35,8 +36,8 @@ class Content extends Eloquent {
 		}
 	}
 
-	public function update($parameters) {
-		$this->revisions()->insert(new Revision($parameters));
+	public function revise($parameters) {
+		$this->revisions()->save(new Revision($parameters));
 	}
 
 }

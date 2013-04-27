@@ -25,6 +25,8 @@ class CreateRevisionsTable extends Migration {
 
 			$table->string('slug')->nullable()->index();
 			$table->string('item_name')->nullable();
+
+			$table->timestamps();
 			
 		});
 	}

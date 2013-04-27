@@ -6,12 +6,12 @@ class Language extends Eloquent {
 	protected $guarded = array('id');
 	public $timestamps = false;
 
-	public static function list() {
+	public static function listAll() {
 		return DB::table('languages')->lists('name');
 	}
 
 	public static function __callStatic($name, $field) {
-		$field = 'id'
+		$field = 'id';
 		if (isset($arguments[0]))
 			$field = $arguments[0];
 

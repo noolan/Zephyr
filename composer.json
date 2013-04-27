@@ -1,7 +1,6 @@
 {
 	"require": {
-		"laravel/framework": "4.0.*",
-		"ccampbell/chromephp": ">=1.0.0"
+		"laravel/framework": "4.0.*"
 	},
 	"autoload": {
 		"classmap": [
@@ -9,12 +8,14 @@
 			"app/controllers",
 			"app/models",
 			"app/database/migrations",
-			"app/database/seeds",
-			"app/composers.php"
+			"app/database/seeds"
 		]
 	},
 	"scripts": {
 		"post-update-cmd": "php artisan optimize"
+	},
+	"config": {
+		"preferred-install": "dist"
 	},
 	"minimum-stability": "dev"
 }

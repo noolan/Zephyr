@@ -7,15 +7,15 @@ class Item extends Eloquent {
 	public $timestamps = true;
 
 	public function revisions() {
-		return $this->hasMany('Revision');
+		return $this->morphMany('Revision', 'revised');
 	}
 
 	public function stream() {
 		return $this->belongsTo('Stream');
 	}
 
-	public function update($parameters) {
-		$this->revisions()->insert(new Revision($parameters));
+	public function revise($parameters) {
+		$this->revisions()->save(new Revision($parameters));
 	}
 
 

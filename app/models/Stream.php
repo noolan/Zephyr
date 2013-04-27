@@ -7,7 +7,7 @@ class Stream extends Eloquent {
 	public $timestamps = false;
 
 	public function revisions() {
-		return $this->hasMany('Revision');
+		return $this->morphMany('Revision', 'revised');
 	}
 
 	public function items() {
@@ -15,10 +15,10 @@ class Stream extends Eloquent {
 	}
 
 	public static function add($parameters) {
-		$stream = Stream::create());
+		$stream = Stream::create(array());
 
-		foreach($parameters->revisions as $language => $revision) {
-			$item->update(array(
+		foreach($parameters['revisions'] as $language => $revision) {
+			$stream->revise(array(
 				'language_id' => Language::$language(),
 				'name'        => $revision['name'],
 				'slug'        => $revision['slug'],
@@ -28,8 +28,8 @@ class Stream extends Eloquent {
 		}
 	}
 
-	public function update($parameters) {
-		$this->revisions()->insert(new Revision($parameters));
+	public function revise($parameters) {
+		$this->revisions()->save(new Revision($parameters));
 	}
 
 	public function addItem($parameters) {
@@ -37,8 +37,8 @@ class Stream extends Eloquent {
 			'stream_id' => $this->id,
 		));
 
-		foreach($parameters->revisions as $language => $revision) {
-			$item->update(array(
+		foreach($parameters['revisions'] as $language => $revision) {
+			$item->revise(array(
 				'language_id' => Language::$language(),
 				'name'        => $revision['name'],
 				'content'     => $revision['content']
