@@ -48,7 +48,7 @@
 @stop
 
 @section('content')
-	<form class="form-signin" action="{{ URL::to('login') }}" method="POST">
+	<form class="form-signin" action="{{ URL::to(Language::current()->abbreviation.'/login') }}" method="POST">
     <h2 class="form-signin-heading">Please log in</h2>
     @if(Session::has('alert'))
       <div class="alert alert-{{ Session::get('alert') }} fade in">

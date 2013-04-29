@@ -6,9 +6,11 @@ $vendorDir = dirname(dirname(__FILE__));
 $baseDir = dirname($vendorDir);
 
 return array(
+    'AddDefaultFieldToLanguages' => $baseDir . '/app/database/migrations/2013_04_27_225824_add_default_field_to_languages.php',
     'BaseController' => $baseDir . '/app/controllers/BaseController.php',
     'Carbon\\Carbon' => $vendorDir . '/nesbot/carbon/Carbon/Carbon.php',
     'Carbon\\Tests\\TestFixture' => $vendorDir . '/nesbot/carbon/Carbon/Tests/TestFixture.php',
+    'ChromePhp' => $vendorDir . '/ccampbell/chromephp/ChromePhp.php',
     'ClassPreloader\\Application' => $vendorDir . '/classpreloader/classpreloader/src/ClassPreloader/Application.php',
     'ClassPreloader\\ClassList' => $vendorDir . '/classpreloader/classpreloader/src/ClassPreloader/ClassList.php',
     'ClassPreloader\\ClassLoader' => $vendorDir . '/classpreloader/classpreloader/src/ClassPreloader/ClassLoader.php',
@@ -19,7 +21,6 @@ return array(
     'ClassPreloader\\Parser\\DirVisitor' => $vendorDir . '/classpreloader/classpreloader/src/ClassPreloader/Parser/DirVisitor.php',
     'ClassPreloader\\Parser\\FileVisitor' => $vendorDir . '/classpreloader/classpreloader/src/ClassPreloader/Parser/FileVisitor.php',
     'ClassPreloader\\Parser\\NodeTraverser' => $vendorDir . '/classpreloader/classpreloader/src/ClassPreloader/Parser/NodeTraverser.php',
-    'Content' => $baseDir . '/app/models/Page.php',
     'CreateItemsTable' => $baseDir . '/app/database/migrations/2013_04_22_231855_create_items_table.php',
     'CreateLanguagesTable' => $baseDir . '/app/database/migrations/2013_04_22_231551_create_languages_table.php',
     'CreatePagesTable' => $baseDir . '/app/database/migrations/2013_04_22_231730_create_pages_table.php',
@@ -810,6 +811,7 @@ return array(
     'PHPParser_TemplateLoader' => $vendorDir . '/nikic/php-parser/lib/PHPParser/TemplateLoader.php',
     'PHPParser_Unserializer' => $vendorDir . '/nikic/php-parser/lib/PHPParser/Unserializer.php',
     'PHPParser_Unserializer_XML' => $vendorDir . '/nikic/php-parser/lib/PHPParser/Unserializer/XML.php',
+    'Page' => $baseDir . '/app/models/Page.php',
     'PageTableSeeder' => $baseDir . '/app/database/seeds/PageTableSeeder.php',
     'Patchwork\\PHP\\Shim\\Iconv' => $vendorDir . '/patchwork/utf8/class/Patchwork/PHP/Shim/Iconv.php',
     'Patchwork\\PHP\\Shim\\Intl' => $vendorDir . '/patchwork/utf8/class/Patchwork/PHP/Shim/Intl.php',

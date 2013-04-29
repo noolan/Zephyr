@@ -7,7 +7,7 @@
     <meta name="description" content="Tracker">
     <meta name="author" content="Smart Consulting Group">
 
-    <title>Tracker - {{ $title }}</title>
+    <title>{{ $title }}</title>
 
     <link href="/lib/bootstrap/css/bootstrap.css" rel="stylesheet">
 
@@ -18,7 +18,11 @@
     
     @if(Auth::check())
     <style>
-      body { padding-top: 50px; }
+      body { padding-top: 60px; }
+    </style>
+    @else
+    <style>
+      body { padding-top: 10px; }
     </style>
     @endif
 
@@ -35,23 +39,21 @@
           <span class="icon-bar"></span>
           <span class="icon-bar"></span>
         </button>
-        <a class="navbar-brand" href="#">Tracker</a>
+        <a class="navbar-brand" href="#">Zephyr</a>
         <div class="nav-collapse collapse">
           <ul class="nav">
             <li class="dropdown">
-              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Assets  <span class="glyphicon glyphicon-barcode"></span></a>
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Pages <span class="glyphicon glyphicon-file"></span></a>
               <ul class="dropdown-menu">
                 <li><a href="{{ URL::to('assets') }}" class="glyphicon glyphicon-globe"> All</a></li>
                 <li><a href="{{ URL::to('asset') }}" class="glyphicon glyphicon-plus"> Add new</a></li>
                 <li class="divider"></li>
                 <li class="nav-header">By Category</li>
-                @foreach($categories as $category)
-                <li><a href="{{ URL::to('assets/'.Str::plural($category)) }}">{{ $category }}</a></li>
-                @endforeach
+                
               </ul>
             </li>
             <li class="dropdown">
-              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Reports <span class="glyphicon glyphicon-file"></span></a>
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Streams <span class="glyphicon glyphicon-list"></span></a>
               <ul class="dropdown-menu">
                 <li><a href="{{ URL::to('assets') }}" class="glyphicon glyphicon-group"> Users</a></li>
                 <li><a href="{{ URL::to('categories') }}" class="glyphicon glyphicon-folder-open"> Categories</a></li>
@@ -72,6 +74,20 @@
 
     <div class="container">
       @section('content')
+
+      <ul class="nav nav-tabs">
+        @foreach($links as $link)
+        <li{{ ($link->slug == Request::segment(2)) ? ' class="active"' : '' }}>
+          <a href="{{ URL::to(Language::current()->abbreviation.'/'.$link->slug) }}">{{ $link->name }}</a>
+        </li>
+        @endforeach
+        @if(Auth::check())
+        <li{{ (Request::segment(2) == 'page') ? ' class="active"' : '' }}>
+          <a href="{{ URL::to(Language::current()->abbreviation.'/page') }}" class="glyphicon glyphicon-plus"> new page</a>
+        </li>
+        @endif
+      </ul>
+
       @if(Session::has('alert'))
       <div class="alert alert-{{ Session::get('alert') }} fade in">
         <button type="button" class="close" data-dismiss="alert">&times;</button>
@@ -85,13 +101,13 @@
 
     <script src="/lib/jquery/jquery-1.9.1.min.js"></script>
     <script src="/lib/bootstrap/js/bootstrap.min.js"></script>
-    <script src="/lib/mistral/mistral.jquery.js"></script>
+    <script src="/lib/bootstrap-wysiwyg/bootstrap-wysiwyg.js"></script>
     <script>
-      /*$(document).ready(function() {
+      $(document).ready(function() {
         setTimeout(function() {
           $('.alert').alert('close');
         }, 5000);
-      });*/
+      });
     </script>
     @yield('scripts')
 

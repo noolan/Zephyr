@@ -25,14 +25,19 @@ class PageTableSeeder extends Seeder {
 			'order'     => 2,
 			'revisions' => array(
 				'english' => array(
-					'name'        => 'Contact',
+					'name'        => 'Contract',
 					'slug'        => 'contact',
-					'content'     => 'Welcome to Zephyr'
+					'content'     => 'Leave us a message'
 				),
 				'francais' => array(
 					'name'        => 'Coordonnées',
 					'slug'        => 'coordonnees',
 					'content'     => 'Laissez-nous un message'
+				),
+				'english' => array(
+					'name'        => 'Contact',
+					'slug'        => 'contact',
+					'content'     => 'Leave us a message'
 				)
 			)
 		));

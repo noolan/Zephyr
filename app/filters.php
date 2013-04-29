@@ -19,7 +19,30 @@ App::before(function($request)
 
 App::after(function($request, $response)
 {
-	//
+	$monolog = Log::getMonolog();
+	$monolog->pushHandler(new Monolog\Handler\ChromePHPHandler());
+
+	$queries = DB::getQueryLog();
+	if (count($queries) > 0) {
+		$total_time = 0.0;
+		foreach($queries as $query) {
+			$total_time += $query['time'];
+			$monolog->debug($query['query']);
+		}
+		$monolog->debug('Total time: ' . $total_time);
+		$monolog->debug('Queries: ' . count($queries));
+	}
+	/*$queries = DB::getQueryLog();
+	if (count($queries) > 0) {
+		//ChromePhp::log($queries);
+		$total_time = 0.0;
+		foreach($queries as $query) {
+			$total_time += $query['time'];
+			ChromePhp::log($query['query']);
+		}
+		ChromePhp::log('Total time: ' . $total_time);
+		ChromePhp::log('Queries: ' . count($queries));
+	}*/
 });
 
 /*
