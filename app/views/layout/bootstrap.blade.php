@@ -9,8 +9,12 @@
 
     <title>{{ $title }}</title>
 
-    <link href="/lib/bootstrap/css/bootstrap.css" rel="stylesheet">
+    <!-- <link href="/lib/bootstrap_2.3.1/css/bootstrap.min.css" rel="stylesheet"> -->
+    <!-- <link href="/lib/bootstrap_2.3.1/css/bootstrap-responsive.min.css" rel="stylesheet"> -->
 
+    <link rel="stylesheet" href="/lib/bootstrap_3.0_wip/css/bootstrap.css" />
+    <link rel="stylesheet" href="/lib/redactor/redactor.css" />
+    
     <!--[if lt IE 9]>
       <script src="/assets/js/html5shiv.js"></script>
       <script src="/assets/js/respond/respond.min.js"></script>
@@ -83,7 +87,7 @@
         @endforeach
         @if(Auth::check())
         <li{{ (Request::segment(2) == 'page') ? ' class="active"' : '' }}>
-          <a href="{{ URL::to(Language::current()->abbreviation.'/page') }}" class="glyphicon glyphicon-plus"> new page</a>
+          <a href="{{ URL::to(Language::current()->abbreviation.'/page') }}">new page <i class="icon icon-plus"></i></a>
         </li>
         @endif
       </ul>
@@ -100,8 +104,10 @@
     </div>
 
     <script src="/lib/jquery/jquery-1.9.1.min.js"></script>
-    <script src="/lib/bootstrap/js/bootstrap.min.js"></script>
-    <script src="/lib/bootstrap-wysiwyg/bootstrap-wysiwyg.js"></script>
+    <!-- <script src="/lib/bootstrap_2.3.1/js/bootstrap.min.js"></script> -->
+    <script src="/lib/bootstrap_3.0_wip/js/bootstrap.min.js"></script>
+    <!-- <script src="/lib/bootstrap-wysiwyg/bootstrap-wysiwyg.js"></script> -->
+    <script src="/lib/redactor/redactor.min.js"></script>
     <script>
       $(document).ready(function() {
         setTimeout(function() {

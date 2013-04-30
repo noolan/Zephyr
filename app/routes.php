@@ -61,7 +61,9 @@ Route::get('{language}/{page?}', function($language, $page = null) {
 		$page = Page::findBySlug($page);
 
 	if (Auth::check())
-		return View::make('page.edit')->with('title', $page->name)->with('page',  $page);
+		return View::make('page.edit')->with('title', $page->name)
+	                                ->with('page',  $page)
+	                                ->with('languages', Language::listAll());
 	else
 		return View::make('page.view')->with('title', $page->name)->with('page',  $page);
 
