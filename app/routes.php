@@ -1,17 +1,11 @@
 <?php
 
+
 /*
 |--------------------------------------------------------------------------
-| Application Routes
+| Redirection Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register all of the routes for an application.
-| It's a breeze. Simply tell Laravel the URIs it should respond to
-| and give it the Closure to execute when that URI is requested.
-|
 */
-
-View::share('links', Page::links());
 
 Route::get('/', function() {
 	return Redirect::to(Language::current()->abbreviation.'/'.Page::first()->slug);
@@ -52,20 +46,82 @@ Route::get('{lang}/logout', function($lang) {
 
 
 
+/*
+|--------------------------------------------------------------------------
+| New Page Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('{lang}/page', function($lang) {
+	if (Auth::guest())
+		App::abort(404, Lang::get('messages.404'));
+
+	return View::make('page.new')->with('title', 'New Page');
+});
+
+Route::post('{lang}/page', function($lang) {
+	$page = Page::add(array(
+		'order'     => 1,
+		'revisions' => array(
+			$lang => array(
+				'name'        => Input::get('name'),
+				'slug'        => Str::slug(Input::get('name')),
+				'content'     => Input::get('content')
+			),
+		)
+	));
+	return Redirect::to($lang.'/'.$page->slug);
+});
 
 
-Route::get('{language}/{page?}', function($language, $page = null) {
-	if (is_null($page))
-		$page = Page::first();
-	else
-		$page = Page::findBySlug($page);
+/*
+|--------------------------------------------------------------------------
+| Edit Page by Slug Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('{lang}/{page}', function($lang, $page) {
+	$page = Page::findBySlug($page);
 
 	if (Auth::check())
 		return View::make('page.edit')->with('title', $page->name)
-	                                ->with('page',  $page)
-	                                ->with('languages', Language::listAll());
+	                                ->with('page',  $page);
 	else
 		return View::make('page.view')->with('title', $page->name)->with('page',  $page);
+});
 
-	//return View::make('page.view')->with('title', $page->name)->with('page',  $page);
+Route::post('{lang}/{page}', function($lang, $page) {
+	$page = Page::findBySlug($page);
+
+	$page->revise(array(
+		'language_id' => Language::getId($lang),
+		'name'        => Input::get('name'),
+		'slug'        => Str::slug(Input::get('name')),
+		'content'     => Input::get('content')
+	));
+
+	return Redirect::to($lang.'/'.$page->slug);
+});
+
+Route::get('{lang}/page/{id}', function($lang, $id) {
+	$page = Page::findOrFail($id);
+
+	if (Auth::check())
+		return View::make('page.new')->with('title', 'Page: '.$page->id)
+	                                ->with('page',  $page);
+	else
+		App::abort(404, Lang::get('messages.404'));
+});
+
+Route::post('{lang}/page/{id}', function($lang, $id) {
+	$page = Page::findOrFail($id);
+
+	$page->revise(array(
+		'language_id' => Language::getId($lang),
+		'name'        => Input::get('name'),
+		'slug'        => Str::slug(Input::get('name')),
+		'content'     => Input::get('content')
+	));
+
+	return Redirect::to($lang.'/'.$page->slug);
 });

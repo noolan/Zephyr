@@ -19,7 +19,7 @@ class Stream extends Eloquent {
 
 		foreach($parameters['revisions'] as $language => $revision) {
 			$stream->revise(array(
-				'language_id' => Language::$language(),
+				'language_id' => Language::getId($language),
 				'name'        => $revision['name'],
 				'slug'        => $revision['slug'],
 				'item_name'   => $revision['item_name'],
@@ -39,7 +39,7 @@ class Stream extends Eloquent {
 
 		foreach($parameters['revisions'] as $language => $revision) {
 			$item->revise(array(
-				'language_id' => Language::$language(),
+				'language_id' => Language::getId($language),
 				'name'        => $revision['name'],
 				'content'     => $revision['content']
 			));

@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
 class CreateRevisionsTable extends Migration {
@@ -11,7 +12,7 @@ class CreateRevisionsTable extends Migration {
 	 */
 	public function up()
 	{
-		Schema::create('revisions', function($table)
+		Schema::create('revisions', function(Blueprint $table)
 		{
 			$table->increments('id');
 			$table->integer('language_id')->unsigned()->index();

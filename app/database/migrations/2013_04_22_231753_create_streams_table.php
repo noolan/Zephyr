@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
 class CreateStreamsTable extends Migration {
@@ -11,7 +12,7 @@ class CreateStreamsTable extends Migration {
 	 */
 	public function up()
 	{
-		Schema::create('streams', function($table)
+		Schema::create('streams', function(Blueprint $table)
 		{
 			$table->engine = 'MyISAM';
 			$table->increments('id');

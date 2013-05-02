@@ -24,12 +24,14 @@
     <style>
       body { padding-top: 60px; }
     </style>
-    @else
-    <style>
-      body { padding-top: 10px; }
-    </style>
     @endif
-
+    <style>
+      div.description {
+        color:#aaa;
+        font-size: 16px;
+        margin-bottom: 5px;
+      }
+    </style>
     @yield('styles')
 
   </head>
@@ -72,6 +74,20 @@
             </li>
           </ul>
         </div><!--/.nav-collapse -->
+        <ul class="nav pull-right">
+          <li class="dropdown">
+            <a class="dropdown-toggle glyphicon glyphicon-globe" data-toggle="dropdown" href="#">
+              {{ ucwords(Lang::get('messages.language')) }}
+              </a>
+            <ul class="dropdown-menu">
+              @foreach($languages as $language)
+              <li>
+                <a href="{{ URL::to($language->abbreviation) }}">{{ ucwords($language->name) }}</a>
+              </li>
+              @endforeach
+            </ul>
+          </li>
+        </ul>
       </div>
     </div>
     @endif
@@ -79,16 +95,54 @@
     <div class="container">
       @section('content')
 
+      <div class="page-header">
+        <h1>{{ $siteName }} <small>{{ $siteNameExtended }}</small></h1>
+      </div>
+
+      @if(Auth::check())
+      <div class="row description">
+        <div class="span4">
+          Active Pages
+        </div>
+        <div class="span1 pull-right">
+          
+        </div>
+        <div class="span2 pull-right" style="text-align:right; padding-right:32px;">
+          Unused Pages
+        </div>
+      </div>
+      @endif
+
+
       <ul class="nav nav-tabs">
         @foreach($links as $link)
         <li{{ ($link->slug == Request::segment(2)) ? ' class="active"' : '' }}>
           <a href="{{ URL::to(Language::current()->abbreviation.'/'.$link->slug) }}">{{ $link->name }}</a>
         </li>
         @endforeach
-        @if(Auth::check())
-        <li{{ (Request::segment(2) == 'page') ? ' class="active"' : '' }}>
-          <a href="{{ URL::to(Language::current()->abbreviation.'/page') }}">new page <i class="icon icon-plus"></i></a>
+        @unless(Auth::check())
+        <li class="dropdown pull-right">
+          <a class="dropdown-toggle glyphicon glyphicon-globe" data-toggle="dropdown" href="#">
+            {{ ucwords(Lang::get('messages.language')) }}
+            </a>
+          <ul class="dropdown-menu">
+            @foreach($languages as $language)
+            <li>
+              <a href="{{ URL::to($language->abbreviation) }}">{{ ucwords($language->name) }}</a>
+            </li>
+            @endforeach
+          </ul>
         </li>
+        @endunless
+        @if(Auth::check())
+        <li class="pull-right{{ Request::is('*/page') ? ' active' : '' }}">
+          <a href="{{ URL::to(Language::current()->abbreviation.'/page') }}" class="glyphicon glyphicon-plus"> new page</a>
+        </li>
+        @foreach($orphanPages as $page)
+        <li class="pull-right{{ ((Request::segment(2) == 'page') && ($page->id == Request::segment(3))) ? ' active' : '' }}">
+          <a href="{{ URL::to(Language::current()->abbreviation.'/page/'.$page->id) }}">page: {{ $page->id }}</a>
+        </li>
+        @endforeach
         @endif
       </ul>
 

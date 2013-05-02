@@ -1,5 +1,6 @@
 <?php
 
 return array(
-	'404' => 'Page not found'
+	'404'      => 'Page not found',
+	'language' => 'language'
 );

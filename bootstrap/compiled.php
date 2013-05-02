@@ -294,7 +294,7 @@ class Container implements ArrayAccess
         if ($this->isBuildable($concrete, $abstract)) {
             $object = $this->build($concrete, $parameters);
         } else {
-            $object = $this->make($concrete);
+            $object = $this->make($concrete, $parameters);
         }
         // If the requested type is registered as a singleton we'll want to cache off
         // the instances in "memory" so we can return it later without creating an
@@ -783,7 +783,7 @@ class Application extends Container implements HttpKernelInterface
      */
     protected function isMachine($name)
     {
-        return gethostname() == $name;
+        return str_is($name, gethostname());
     }
     /**
      * Determine if we are running in the console.
@@ -962,7 +962,7 @@ class Application extends Container implements HttpKernelInterface
      * Handle the given request and get the response.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return Symfony\Component\HttpFoundation\Response
+     * @return \Symfony\Component\HttpFoundation\Response
      */
     public function dispatch(Request $request)
     {
@@ -978,7 +978,7 @@ class Application extends Container implements HttpKernelInterface
      * @param  \Illuminate\Http\Request  $request
      * @param  int   $type
      * @param  bool  $catch
-     * @return Symfony\Component\HttpFoundation\Response
+     * @return \Symfony\Component\HttpFoundation\Response
      */
     public function handle(SymfonyRequest $request, $type = HttpKernelInterface::MASTER_REQUEST, $catch = true)
     {
@@ -1057,7 +1057,7 @@ class Application extends Container implements HttpKernelInterface
      *
      * @param  mixed  $value
      * @param  \Illuminate\Http\Request  $request
-     * @return Symfony\Component\HttpFoundation\Response
+     * @return \Symfony\Component\HttpFoundation\Response
      */
     public function prepareResponse($value, Request $request)
     {
@@ -1382,7 +1382,7 @@ class Request extends \Symfony\Component\HttpFoundation\Request
      *
      * @param  string  $key
      * @param  mixed   $default
-     * @return Symfony\Component\HttpFoundation\File\UploadedFile
+     * @return \Symfony\Component\HttpFoundation\File\UploadedFile
      */
     public function file($key = null, $default = null)
     {
@@ -1530,7 +1530,7 @@ class Request extends \Symfony\Component\HttpFoundation\Request
     /**
      * Get the input source for the request.
      *
-     * @return Symfony\Component\HttpFoundation\ParameterBag
+     * @return \Symfony\Component\HttpFoundation\ParameterBag
      */
     protected function getInputSource()
     {
@@ -2320,8 +2320,13 @@ class Request
      */
     public function getPort()
     {
-        if (self::$trustedProxies && self::$trustedHeaders[self::HEADER_CLIENT_PORT] && ($port = $this->headers->get(self::$trustedHeaders[self::HEADER_CLIENT_PORT]))) {
-            return $port;
+        if (self::$trustedProxies) {
+            if (self::$trustedHeaders[self::HEADER_CLIENT_PORT] && ($port = $this->headers->get(self::$trustedHeaders[self::HEADER_CLIENT_PORT]))) {
+                return $port;
+            }
+            if (self::$trustedHeaders[self::HEADER_CLIENT_PROTO] && 'https' === $this->headers->get(self::$trustedHeaders[self::HEADER_CLIENT_PROTO], 'http')) {
+                return 443;
+            }
         }
         return $this->server->get('SERVER_PORT');
     }
@@ -4822,6 +4827,13 @@ abstract class ServiceProvider
         if ($this->app['files']->isDirectory($lang)) {
             $this->app['translator']->addNamespace($namespace, $lang);
         }
+        // Next, we will see if the application view folder contains a folder for the
+        // package and namespace. If it does, we'll give that folder precedence on
+        // the loader list for the views so the package views can be overridden.
+        $appView = $this->getAppViewPath($package, $namespace);
+        if ($this->app['files']->isDirectory($appView)) {
+            $this->app['view']->addNamespace($namespace, $appView);
+        }
         // Finally we will register the view namespace so that we can access each of
         // the views available in this package. We use a standard convention when
         // registering the paths to every package's views and other components.
@@ -4893,6 +4905,17 @@ abstract class ServiceProvider
         $events->listen('artisan.start', function ($artisan) use($commands) {
             $artisan->resolveCommands($commands);
         });
+    }
+    /**
+     * Get the application package view path.
+     *
+     * @param  string  $package
+     * @param  string  $namespace
+     * @return string
+     */
+    protected function getAppViewPath($package, $namespace)
+    {
+        return $this->app['path'] . "/views/packages/{$package}/{$namespace}";
     }
     /**
      * Get the services provided by the provider.
@@ -5217,7 +5240,7 @@ abstract class Facade
      * Initiate a mock expectation on the facade.
      *
      * @param  dynamic
-     * @return Mockery\Expectation
+     * @return \Mockery\Expectation
      */
     public static function shouldReceive()
     {
@@ -5414,6 +5437,9 @@ class Str
      */
     public static function is($pattern, $value)
     {
+        if ($pattern == $value) {
+            return true;
+        }
         // Asterisks are translated into zero-or-more regular expression wildcards
         // to make it convenient to check if the strings starts with the given
         // pattern such as "library/*", making any string check convenient.
@@ -5629,6 +5655,7 @@ use Psr\Log\LoggerInterface;
  * ErrorHandler.
  *
  * @author Fabien Potencier <fabien@symfony.com>
+ * @author Konstantin Myakshin <koc-dp@yandex.ru>
  */
 class ErrorHandler
 {
@@ -5636,19 +5663,24 @@ class ErrorHandler
     private $levels = array(E_WARNING => 'Warning', E_NOTICE => 'Notice', E_USER_ERROR => 'User Error', E_USER_WARNING => 'User Warning', E_USER_NOTICE => 'User Notice', E_STRICT => 'Runtime Notice', E_RECOVERABLE_ERROR => 'Catchable Fatal Error', E_DEPRECATED => 'Deprecated', E_USER_DEPRECATED => 'User Deprecated', E_ERROR => 'Error', E_CORE_ERROR => 'Core Error', E_COMPILE_ERROR => 'Compile Error', E_PARSE => 'Parse');
     private $level;
     private $reservedMemory;
-    /** @var LoggerInterface */
-    private static $logger;
+    private $displayErrors;
+    /**
+     * @var LoggerInterface[] Loggers for channels
+     */
+    private static $loggers = array();
     /**
      * Registers the error handler.
      *
      * @param integer $level The level at which the conversion to Exception is done (null to use the error_reporting() value and 0 to disable)
+     * @param Boolean $displayErrors Display errors (for dev environment) or just log they (production usage)
      *
      * @return The registered error handler
      */
-    public static function register($level = null)
+    public static function register($level = null, $displayErrors = true)
     {
         $handler = new static();
         $handler->setLevel($level);
+        $handler->setDisplayErrors($displayErrors);
         ini_set('display_errors', 0);
         set_error_handler(array($handler, 'handle'));
         register_shutdown_function(array($handler, 'handleFatal'));
@@ -5659,9 +5691,13 @@ class ErrorHandler
     {
         $this->level = null === $level ? error_reporting() : $level;
     }
-    public static function setLogger(LoggerInterface $logger)
+    public function setDisplayErrors($displayErrors)
     {
-        self::$logger = $logger;
+        $this->displayErrors = $displayErrors;
+    }
+    public static function setLogger(LoggerInterface $logger, $channel = 'deprecation')
+    {
+        self::$loggers[$channel] = $logger;
     }
     /**
      * @throws \ErrorException When error_reporting returns error
@@ -5672,7 +5708,7 @@ class ErrorHandler
             return false;
         }
         if ($level & (E_USER_DEPRECATED | E_DEPRECATED)) {
-            if (null !== self::$logger) {
+            if (isset(self::$loggers['deprecation'])) {
                 if (version_compare(PHP_VERSION, '5.4', '<')) {
                     $stack = array_map(function ($row) {
                         unset($row['args']);
@@ -5681,11 +5717,11 @@ class ErrorHandler
                 } else {
                     $stack = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 10);
                 }
-                self::$logger->warning($message, array('type' => self::TYPE_DEPRECATION, 'stack' => $stack));
+                self::$loggers['deprecation']->warning($message, array('type' => self::TYPE_DEPRECATION, 'stack' => $stack));
             }
             return true;
         }
-        if (error_reporting() & $level && $this->level & $level) {
+        if ($this->displayErrors && error_reporting() & $level && $this->level & $level) {
             throw new \ErrorException(sprintf('%s: %s in %s line %d', isset($this->levels[$level]) ? $this->levels[$level] : $level, $message, $file, $line), 0, $level, $file, $line);
         }
         return false;
@@ -5698,6 +5734,13 @@ class ErrorHandler
         unset($this->reservedMemory);
         $type = $error['type'];
         if (0 === $this->level || !in_array($type, array(E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE))) {
+            return;
+        }
+        if (isset(self::$loggers['emergency'])) {
+            $fatal = array('type' => $type, 'file' => $error['file'], 'line' => $error['line']);
+            self::$loggers['emergency']->emerg($error['message'], $fatal);
+        }
+        if (!$this->displayErrors) {
             return;
         }
         // get current exception handler
@@ -6179,7 +6222,7 @@ class FileLoader implements LoaderInterface
     /**
      * The filesystem instance.
      *
-     * @var \Illuminate\Filesystem
+     * @var \Illuminate\Filesystem\Filesystem
      */
     protected $files;
     /**
@@ -6203,7 +6246,7 @@ class FileLoader implements LoaderInterface
     /**
      * Create a new file configuration loader.
      *
-     * @param  \Illuminate\Filesystem  $files
+     * @param  \Illuminate\Filesystem\Filesystem  $files
      * @param  string  $defaultPath
      * @return void
      */
@@ -6364,7 +6407,7 @@ class FileLoader implements LoaderInterface
     /**
      * Get the Filesystem instance.
      *
-     * @return \Illuminate\Filesystem
+     * @return \Illuminate\Filesystem\Filesystem
      */
     public function getFilesystem()
     {
@@ -6421,6 +6464,7 @@ interface LoaderInterface
 namespace Illuminate\Filesystem;
 
 use FilesystemIterator;
+use Symfony\Component\Finder\Finder;
 class FileNotFoundException extends \Exception
 {
     
@@ -6636,6 +6680,30 @@ class Filesystem
         return array_filter($glob, function ($file) {
             return filetype($file) == 'file';
         });
+    }
+    /**
+     * Get all of the files from the given directory (recursive).
+     *
+     * @param  string  $directory
+     * @return array
+     */
+    public function allFiles($directory)
+    {
+        return iterator_to_array(Finder::create()->files()->in($directory), false);
+    }
+    /**
+     * Get all of the directories within a given directory.
+     *
+     * @param  string  $directory
+     * @return array
+     */
+    public function directories($directory)
+    {
+        $directories = array();
+        foreach (Finder::create()->in($directory)->directories()->depth(0) as $dir) {
+            $directories[] = $dir->getRealPath();
+        }
+        return $directories;
     }
     /**
      * Create a directory.
@@ -6876,7 +6944,7 @@ class ProviderRepository
     /**
      * The filesystem instance.
      *
-     * @var \Illuminate\Filesystem
+     * @var \Illuminate\Filesystem\Filesystem
      */
     protected $files;
     /**
@@ -6888,7 +6956,7 @@ class ProviderRepository
     /**
      * Create a new service repository instance.
      *
-     * @param  \Illuminate\Filesystem  $files
+     * @param  \Illuminate\Filesystem\Filesystem  $files
      * @param  string  $manifestPath
      * @return void
      */
@@ -7029,7 +7097,7 @@ class ProviderRepository
     /**
      * Get the filesystem instance.
      *
-     * @return \Illuminate\Filesystem
+     * @return \Illuminate\Filesystem\Filesystem
      */
     public function getFilesystem()
     {
@@ -7082,8 +7150,8 @@ class DatabaseServiceProvider extends ServiceProvider
         // The connection factory is used to create the actual connection instances on
         // the database. We will inject the factory into the manager so that it may
         // make the connections while they are actually needed and not of before.
-        $this->app['db.factory'] = $this->app->share(function () {
-            return new ConnectionFactory();
+        $this->app['db.factory'] = $this->app->share(function ($app) {
+            return new ConnectionFactory($app);
         });
         // The database manager is used to resolve various connections, since multiple
         // connections might be managed. It also implements the connection resolver
@@ -7461,7 +7529,7 @@ class Router
     /**
      * The inversion of control container instance.
      *
-     * @var \Illuminate\Container
+     * @var \Illuminate\Container\Container
      */
     protected $container;
     /**
@@ -8185,8 +8253,8 @@ class Router
     /**
      * Get the response for a given request.
      *
-     * @param  Symfony\Component\HttpFoundation\Request  $request
-     * @return Symfony\Component\HttpFoundation\Response
+     * @param  \Symfony\Component\HttpFoundation\Request  $request
+     * @return \Symfony\Component\HttpFoundation\Response
      */
     public function dispatch(Request $request)
     {
@@ -8210,7 +8278,7 @@ class Router
     /**
      * Match the given request to a route object.
      *
-     * @param  Symfony\Component\HttpFoundation\Request  $request
+     * @param  \Symfony\Component\HttpFoundation\Request  $request
      * @return \Illuminate\Routing\Route
      */
     protected function findRoute(Request $request)
@@ -8371,8 +8439,8 @@ class Router
     /**
      * Call the "after" global filters.
      *
-     * @param  Symfony\Component\HttpFoundation\Request   $request
-     * @param  Symfony\Component\HttpFoundation\Response  $response
+     * @param  \Symfony\Component\HttpFoundation\Request   $request
+     * @param  \Symfony\Component\HttpFoundation\Response  $response
      * @return mixed
      */
     protected function callAfterFilter(Request $request, SymfonyResponse $response)
@@ -8382,8 +8450,8 @@ class Router
     /**
      * Call the finish" global filter.
      *
-     * @param  Symfony\Component\HttpFoundation\Request   $request
-     * @param  Symfony\Component\HttpFoundation\Response  $response
+     * @param  \Symfony\Component\HttpFoundation\Request   $request
+     * @param  \Symfony\Component\HttpFoundation\Response  $response
      * @return mixed
      */
     public function callFinishFilter(Request $request, SymfonyResponse $response)
@@ -8393,8 +8461,8 @@ class Router
     /**
      * Call the "close" global filter.
      *
-     * @param  Symfony\Component\HttpFoundation\Request   $request
-     * @param  Symfony\Component\HttpFoundation\Response  $response
+     * @param  \Symfony\Component\HttpFoundation\Request   $request
+     * @param  \Symfony\Component\HttpFoundation\Response  $response
      * @return mixed
      */
     public function callCloseFilter(Request $request, SymfonyResponse $response)
@@ -8404,7 +8472,7 @@ class Router
     /**
      * Call a given global filter with the parameters.
      *
-     * @param  Symfony\Component\HttpFoundation\Request  $request
+     * @param  \Symfony\Component\HttpFoundation\Request  $request
      * @param  string  $name
      * @param  array   $parameters
      * @return mixed
@@ -8445,7 +8513,7 @@ class Router
      * @param  string  $class
      * @return void
      */
-    public function model($key, $class)
+    public function model($key, $class, Closure $callback = null)
     {
         return $this->bind($key, function ($value) use($class) {
             if (is_null($value)) {
@@ -8456,6 +8524,12 @@ class Router
             // throw a not found exception otherwise we will return the instance.
             if (!is_null($model = with(new $class())->find($value))) {
                 return $model;
+            }
+            // If a callback was supplied to the method we will call that to determine
+            // what we should do when the model is not found. This just gives these
+            // developer a little greater flexibility to decide what will happen.
+            if ($callback instanceof Closure) {
+                return call_user_func($callback);
             }
             throw new NotFoundHttpException();
         });
@@ -8497,7 +8571,7 @@ class Router
      *
      * @param  mixed  $value
      * @param  \Illuminate\Http\Request  $request
-     * @return Symfony\Component\HttpFoundation\Response
+     * @return \Symfony\Component\HttpFoundation\Response
      */
     public function prepare($value, Request $request)
     {
@@ -8597,7 +8671,7 @@ class Router
     /**
      * Retrieve the entire route collection.
      * 
-     * @return Symfony\Component\Routing\RouteCollection
+     * @return \Symfony\Component\Routing\RouteCollection
      */
     public function getRoutes()
     {
@@ -8606,7 +8680,7 @@ class Router
     /**
      * Get the current request being dispatched.
      *
-     * @return Symfony\Component\HttpFoundation\Request
+     * @return \Symfony\Component\HttpFoundation\Request
      */
     public function getRequest()
     {
@@ -8652,8 +8726,8 @@ class Router
     /**
      * Create a new URL matcher instance.
      *
-     * @param  Symfony\Component\HttpFoundation\Request  $request
-     * @return Symfony\Component\Routing\Matcher\UrlMatcher
+     * @param  \Symfony\Component\HttpFoundation\Request  $request
+     * @return \Symfony\Component\Routing\Matcher\UrlMatcher
      */
     protected function getUrlMatcher(Request $request)
     {
@@ -9025,8 +9099,27 @@ class Dispatcher
      */
     public function listen($event, $listener, $priority = 0)
     {
+        if (str_contains($event, '*')) {
+            return $this->setupWildcardListen($event, $listener, $priority = 0);
+        }
         $this->listeners[$event][$priority][] = $this->makeListener($listener);
         unset($this->sorted[$event]);
+    }
+    /**
+     * Setup a wildcard listener callback.
+     *
+     * @param  string  $event
+     * @param  mixed   $listener
+     * @param  int     $priority
+     * @return void
+     */
+    protected function setupWildcardListen($event, $listener, $priority)
+    {
+        foreach (array_keys($this->listeners) as $key) {
+            if (str_is($event, $key)) {
+                $this->listen($key, $listener, $priority);
+            }
+        }
     }
     /**
      * Determine if a given event has listeners.
@@ -9114,6 +9207,7 @@ class Dispatcher
         if (!is_array($payload)) {
             $payload = array($payload);
         }
+        $payload[] = $event;
         foreach ($this->getListeners($event) as $listener) {
             $response = call_user_func_array($listener, $payload);
             // If a response is returned from the listener and event halting is enabled
@@ -9279,6 +9373,12 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
      * @var array
      */
     protected $hidden = array();
+    /**
+     * The attributes that should be visible in arrays.
+     *
+     * @var arrays
+     */
+    protected $visible = array();
     /**
      * The attributes that are mass assignable.
      *
@@ -9839,6 +9939,44 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
         }
     }
     /**
+     * Increment a column's value by a given amount.
+     *
+     * @param  string  $column
+     * @param  int     $amount
+     * @return int
+     */
+    protected function increment($column, $amount = 1)
+    {
+        return $this->incrementOrDecrement($column, $amount, 'increment');
+    }
+    /**
+     * Decrement a column's value by a given amount.
+     *
+     * @param  string  $column
+     * @param  int     $amount
+     * @return int
+     */
+    protected function decrement($column, $amount = 1)
+    {
+        return $this->incrementOrDecrement($column, $amount, 'decrement');
+    }
+    /**
+     * Run the increment or decrement method on the model.
+     *
+     * @param  string  $column
+     * @param  int     $amount
+     * @param  string  $method
+     * @return void
+     */
+    protected function incrementOrDecrement($column, $amount, $method)
+    {
+        $query = $this->newQuery();
+        if (!$this->exists) {
+            return $query->{$method}($column, $amount);
+        }
+        return $query->where($this->getKeyName(), $this->getKey())->{$method}($column, $amount);
+    }
+    /**
      * Update the model in the database.
      *
      * @param  array  $attributes
@@ -10240,6 +10378,16 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
         $this->hidden = $hidden;
     }
     /**
+     * Set the visible attributes for the model.
+     *
+     * @param  array  $visible
+     * @return void
+     */
+    public function setVisible(array $visible)
+    {
+        $this->visible = $visible;
+    }
+    /**
      * Get the fillable attributes for the model.
      *
      * @return array
@@ -10436,6 +10584,9 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
      */
     protected function getAccessibleAttributes()
     {
+        if (count($this->visible) > 0) {
+            return array_intersect_key($this->attributes, array_flip($this->visible));
+        }
         return array_diff_key($this->attributes, array_flip($this->hidden));
     }
     /**
@@ -10891,6 +11042,9 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
      */
     public function __call($method, $parameters)
     {
+        if (in_array($method, array('increment', 'decrement'))) {
+            return call_user_func_array(array($this, $method), $parameters);
+        }
         $query = $this->newQuery();
         return call_user_func_array(array($query, $method), $parameters);
     }
@@ -10998,6 +11152,17 @@ class DatabaseManager implements ConnectionResolverInterface
             $this->connections[$name] = $this->prepare($connection);
         }
         return $this->connections[$name];
+    }
+    /**
+     * Reconnect to the given database.
+     *
+     * @param  string  $name
+     * @return \Illuminate\Database\Connection
+     */
+    public function reconnect($name = null)
+    {
+        unset($this->connections[$name]);
+        return $this->connection($name);
     }
     /**
      * Make the database connection instance.
@@ -11120,12 +11285,29 @@ interface ConnectionResolverInterface
 namespace Illuminate\Database\Connectors;
 
 use PDO;
+use Illuminate\Container\Container;
 use Illuminate\Database\MySqlConnection;
 use Illuminate\Database\SQLiteConnection;
 use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\SqlServerConnection;
 class ConnectionFactory
 {
+    /**
+     * The IoC container instance.
+     *
+     * @var \Illuminate\Container\Container
+     */
+    protected $container;
+    /**
+     * Create a new connection factory instance.
+     *
+     * @param  \Illuminate\Container\Container  $container
+     * @return void
+     */
+    public function __construct(Container $container)
+    {
+        $this->container = $container;
+    }
     /**
      * Establish a PDO connection based on the configuration.
      *
@@ -11171,21 +11353,24 @@ class ConnectionFactory
      * @param  string  $driver
      * @param  PDO     $connection
      * @param  string  $database
-     * @param  string  $tablePrefix
-     * @param  string  $name
+     * @param  string  $prefix
+     * @param  array   $config
      * @return \Illuminate\Database\Connection
      */
-    protected function createConnection($driver, PDO $connection, $database, $tablePrefix = '', $name = null)
+    protected function createConnection($driver, PDO $connection, $database, $prefix = '', $config = null)
     {
+        if ($this->container->bound($key = "db.connection.{$driver}")) {
+            return $this->container->make($key, array($connection, $database, $prefix, $config));
+        }
         switch ($driver) {
             case 'mysql':
-                return new MySqlConnection($connection, $database, $tablePrefix, $name);
+                return new MySqlConnection($connection, $database, $prefix, $config);
             case 'pgsql':
-                return new PostgresConnection($connection, $database, $tablePrefix, $name);
+                return new PostgresConnection($connection, $database, $prefix, $config);
             case 'sqlite':
-                return new SQLiteConnection($connection, $database, $tablePrefix, $name);
+                return new SQLiteConnection($connection, $database, $prefix, $config);
             case 'sqlsrv':
-                return new SqlServerConnection($connection, $database, $tablePrefix, $name);
+                return new SqlServerConnection($connection, $database, $prefix, $config);
         }
         throw new \InvalidArgumentException("Unsupported driver [{$driver}]");
     }
@@ -11315,6 +11500,7 @@ class Store extends SymfonySession
     {
         $this->put($key, $value);
         $this->push('flash.new', $key);
+        $this->removeFromOldFlashData(array($key));
     }
     /**
      * Flash an input array to the session.
@@ -11325,6 +11511,49 @@ class Store extends SymfonySession
     public function flashInput(array $value)
     {
         return $this->flash('_old_input', $value);
+    }
+    /**
+     * Reflash all of the session flash data.
+     *
+     * @return void
+     */
+    public function reflash()
+    {
+        $this->mergeNewFlashes($this->get('flash.old'));
+        $this->put('flash.old', array());
+    }
+    /**
+     * Reflash a subset of the current flash data.
+     *
+     * @param  array|dynamic  $keys
+     * @return void
+     */
+    public function keep($keys = null)
+    {
+        $keys = is_array($keys) ? $keys : func_get_args();
+        $this->mergeNewFlashes($keys);
+        $this->removeFromOldFlashData($keys);
+    }
+    /**
+     * Merge new flash keys into the new flash array.
+     *
+     * @param  array  $keys
+     * @return void
+     */
+    protected function mergeNewFlashes(array $keys)
+    {
+        $values = array_unique(array_merge($this->get('flash.new'), $keys));
+        $this->put('flash.new', $values);
+    }
+    /**
+     * Remove the given keys from the old flash data.
+     *
+     * @param  array  $keys
+     * @return void
+     */
+    protected function removeFromOldFlashData(array $keys)
+    {
+        $this->put('flash.old', array_diff($this->get('flash.old', array()), $keys));
     }
     /**
      * Remove an item from the session.
@@ -11658,7 +11887,7 @@ class CookieJar
     /**
      * Create a new cookie manager instance.
      *
-     * @param  Symfony\Component\HttpFoundation\Request  $request
+     * @param  \Symfony\Component\HttpFoundation\Request  $request
      * @param  \Illuminate\Encryption\Encrypter  $encrypter
      * @return void
      */
@@ -11716,7 +11945,7 @@ class CookieJar
      * @param  string  $domain
      * @param  bool    $secure
      * @param  bool    $httpOnly
-     * @return Symfony\Component\HttpFoundation\Cookie
+     * @return \Symfony\Component\HttpFoundation\Cookie
      */
     public function make($name, $value, $minutes = 0, $path = null, $domain = null, $secure = false, $httpOnly = true)
     {
@@ -11737,7 +11966,7 @@ class CookieJar
      * @param  string  $domain
      * @param  bool    $secure
      * @param  bool    $httpOnly
-     * @return Symfony\Component\HttpFoundation\Cookie
+     * @return \Symfony\Component\HttpFoundation\Cookie
      */
     public function forever($name, $value, $path = null, $domain = null, $secure = false, $httpOnly = true)
     {
@@ -11747,7 +11976,7 @@ class CookieJar
      * Expire the given cookie.
      *
      * @param  string  $name
-     * @return Symfony\Component\HttpFoundation\Cookie
+     * @return \Symfony\Component\HttpFoundation\Cookie
      */
     public function forget($name)
     {
@@ -11779,7 +12008,7 @@ class CookieJar
     /**
      * Get the request instance.
      *
-     * @return Symfony\Component\HttpFoundation\Request
+     * @return \Symfony\Component\HttpFoundation\Request
      */
     public function getRequest()
     {
@@ -12085,7 +12314,7 @@ class Writer
     /**
      * The Monolog logger instance.
      *
-     * @var Monolog\Logger
+     * @var \Monolog\Logger
      */
     protected $monolog;
     /**
@@ -12103,7 +12332,7 @@ class Writer
     /**
      * Create a new log writer instance.
      *
-     * @param  Monolog\Logger  $monolog
+     * @param  \Monolog\Logger  $monolog
      * @param  \Illuminate\Events\Dispatcher  $dispatcher
      * @return void
      */
@@ -12171,7 +12400,7 @@ class Writer
     /**
      * Get the underlying Monolog instance.
      *
-     * @return Monolog\Logger
+     * @return \Monolog\Logger
      */
     public function getMonolog()
     {
@@ -14021,7 +14250,7 @@ class Route extends BaseRoute
     /**
      * Execute the route and return the response.
      *
-     * @param  Symfony\Component\HttpFoundation\Request  $request
+     * @param  \Symfony\Component\HttpFoundation\Request  $request
      * @return mixed
      */
     public function run(Request $request)
@@ -14058,7 +14287,7 @@ class Route extends BaseRoute
     /**
      * Call all of the before filters on the route.
      *
-     * @param  Symfony\Component\HttpFoundation\Request   $request
+     * @param  \Symfony\Component\HttpFoundation\Request   $request
      * @return mixed
      */
     protected function callBeforeFilters(Request $request)
@@ -14078,7 +14307,7 @@ class Route extends BaseRoute
     /**
      * Get all of the before filters to run on the route.
      *
-     * @param  Symfony\Component\HttpFoundation\Request  $request
+     * @param  \Symfony\Component\HttpFoundation\Request  $request
      * @return array
      */
     protected function getAllBeforeFilters(Request $request)
@@ -14089,8 +14318,8 @@ class Route extends BaseRoute
     /**
      * Call all of the "after" filters for a route.
      *
-     * @param  Symfony\Component\HttpFoundation\Request  $request
-     * @param  Symfony\Component\HttpFoundation\Response  $response
+     * @param  \Symfony\Component\HttpFoundation\Request  $request
+     * @param  \Symfony\Component\HttpFoundation\Response  $response
      * @return void
      */
     protected function callAfterFilters(Request $request, $response)
@@ -14103,7 +14332,7 @@ class Route extends BaseRoute
      * Call a given filter with the parameters.
      *
      * @param  string  $name
-     * @param  Symfony\Component\HttpFoundation\Request  $request
+     * @param  \Symfony\Component\HttpFoundation\Request  $request
      * @param  array   $params
      * @return mixed
      */
@@ -14465,7 +14694,7 @@ class FileViewFinder implements ViewFinderInterface
     /**
      * The filesystem instance.
      *
-     * @var \Illuminate\Filesystem
+     * @var \Illuminate\Filesystem\Filesystem
      */
     protected $files;
     /**
@@ -14489,7 +14718,7 @@ class FileViewFinder implements ViewFinderInterface
     /**
      * Create a new file view loader instance.
      *
-     * @param  \Illuminate\Filesystem  $files
+     * @param  \Illuminate\Filesystem\Filesystem  $files
      * @param  array  $paths
      * @param  array  $extensions
      * @return void
@@ -14614,7 +14843,7 @@ class FileViewFinder implements ViewFinderInterface
     /**
      * Get the filesystem instance.
      *
-     * @return \Illuminate\Filesystem
+     * @return \Illuminate\Filesystem\Filesystem
      */
     public function getFilesystem()
     {
@@ -14654,6 +14883,7 @@ use Closure;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Container\Container;
 use Illuminate\View\Engines\EngineResolver;
+use Illuminate\Support\Contracts\ArrayableInterface as Arrayable;
 class Environment
 {
     /**
@@ -14741,13 +14971,25 @@ class Environment
      * Get a evaluated view contents for the given view.
      *
      * @param  string  $view
-     * @param  mixed   $data
+     * @param  array   $data
+     * @param  array   $mergeData
      * @return \Illuminate\View\View
      */
-    public function make($view, $data = array())
+    public function make($view, $data = array(), $mergeData = array())
     {
         $path = $this->finder->find($view);
+        $data = array_merge($this->parseData($data), $mergeData);
         return new View($this, $this->getEngineFromPath($path), $view, $path, $data);
+    }
+    /**
+     * Parse the given data into a raw array.
+     *
+     * @param  mixed  $data
+     * @return array
+     */
+    protected function parseData($data)
+    {
+        return $data instanceof Arrayable ? $data->toArray() : $data;
     }
     /**
      * Get a evaluated view contents for a named view.
@@ -14974,12 +15216,17 @@ class Environment
     /**
      * Stop injecting content into a section.
      *
+     * @param  bool  $overwrite
      * @return string
      */
-    public function stopSection()
+    public function stopSection($overwrite = false)
     {
         $last = array_pop($this->sectionStack);
-        $this->extendSection($last, ob_get_clean());
+        if ($overwrite) {
+            $this->sections[$last] = ob_get_clean();
+        } else {
+            $this->extendSection($last, ob_get_clean());
+        }
         return $last;
     }
     /**
@@ -17680,7 +17927,7 @@ class Response extends \Symfony\Component\HttpFoundation\Response
     /**
      * Add a cookie to the response.
      *
-     * @param  Symfony\Component\HttpFoundation\Cookie  $cookie
+     * @param  \Symfony\Component\HttpFoundation\Cookie  $cookie
      * @return \Illuminate\Http\Response
      */
     public function withCookie(Cookie $cookie)
@@ -17700,13 +17947,36 @@ class Response extends \Symfony\Component\HttpFoundation\Response
         // If the content is "JSONable" we will set the appropriate header and convert
         // the content to JSON. This is useful when returning something like models
         // from routes that will be automatically transformed to their JSON form.
-        if ($content instanceof JsonableInterface) {
+        if ($this->shouldBeJson($content)) {
             $this->headers->set('Content-Type', 'application/json');
-            $content = $content->toJson();
+            $content = $this->morphToJson($content);
         } elseif ($content instanceof RenderableInterface) {
             $content = $content->render();
         }
         return parent::setContent($content);
+    }
+    /**
+     * Morph the given content into JSON.
+     *
+     * @param  mixed   $content
+     * @return string
+     */
+    protected function morphToJson($content)
+    {
+        if ($content instanceof JsonableInterface) {
+            return $content->toJson();
+        }
+        return json_encode($content);
+    }
+    /**
+     * Determine if the given content should be turned into JSON.
+     *
+     * @param  mixed  $content
+     * @return bool
+     */
+    protected function shouldBeJson($content)
+    {
+        return $content instanceof JsonableInterface or is_array($content);
     }
     /**
      * Get the original response content.

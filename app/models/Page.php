@@ -14,15 +14,27 @@ class Page extends Eloquent {
 
 	public static function links() {
 		return DB::table('pages')->join('revisions', 'pages.id', '=', 'revisions.revised_id')
-														 ->whereRaw('revisions.revised_type = "Page"')
+														 ->distinct()
+		                         ->whereRaw('revisions.revised_type = "Page"')
 														 ->whereRaw('revisions.language_id = '. Language::current()->id)
 		                         ->whereExists(function($query) {
+																$query->select(DB::raw(1))
+																			->from('revisions')
+																			->whereRaw('revisions.revised_id = pages.id')
+																			->whereRaw('revisions.revised_type = "Page"')
+																			->whereRaw('revisions.language_id = ' . Language::current()->id);
+															 })->groupBy(DB::raw('pages.id'))->get();
+
+	}
+
+	public static function noRevisions() {
+		return DB::table('pages')->whereNotExists(function($query) {
 			$query->select(DB::raw(1))
 						->from('revisions')
 						->whereRaw('revisions.revised_id = pages.id')
 						->whereRaw('revisions.revised_type = "Page"')
 						->whereRaw('revisions.language_id = ' . Language::current()->id);
-		})->get();
+		})->orderBy('order', 'DESC')->get();
 
 	}
 
@@ -64,12 +76,13 @@ class Page extends Eloquent {
 		//var_dump($parameters); die();
 		foreach($parameters['revisions'] as $language => $revision) {
 			$page->revise(array(
-				'language_id' => Language::$language(),
+				'language_id' => Language::getId($language),
 				'name'        => $revision['name'],
 				'slug'        => $revision['slug'],
 				'content'     => $revision['content']
 			));
 		}
+		return $page;
 	}
 
 	public function revise($parameters) {

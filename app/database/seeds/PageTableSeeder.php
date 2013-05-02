@@ -42,5 +42,16 @@ class PageTableSeeder extends Seeder {
 			)
 		));
 
+		Page::add(array(
+			'order'     => 3,
+			'revisions' => array(
+				'francais' => array(
+					'name'        => 'Français Seulement',
+					'slug'        => 'francais-seulement',
+					'content'     => 'Cette page n\'a pas une traduction en anglais.'
+				)
+			)
+		));
+
 	}
 }

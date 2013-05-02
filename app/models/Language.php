@@ -25,16 +25,11 @@ class Language extends Eloquent {
 		return DB::table('languages')->lists('name');
 	}
 
-	public static function __callStatic($name, $field) {
-		$field = 'id';
-		if (isset($arguments[0]))
-			$field = $arguments[0];
-
-		return DB::table('languages')->where('name', $name)->pluck($field);
-	}
-
-	public function getAbbrAttribute() {
-		return $this->attributes['abbreviation'];
+	public static function getId($language) {
+		if (strlen($language) == 2)
+			return (int)DB::table('languages')->where('abbreviation', $language)->pluck('id');
+		else
+			return (int)DB::table('languages')->where('name', $language)->pluck('id');
 	}
 
 	public function setDefaultAttribute($value) {

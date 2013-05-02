@@ -37,13 +37,13 @@
 			<label for="title">Title:</label>
 		</div>
 		<div class="span4">
-			<input name="name" type="text" placeholder="page title" value="{{ $page->name }}">
+			<input name="name" type="text" placeholder="page title" value="{{ Input::old('name') }}">
 		</div>
 		<div class="span4 pull-right">
-			<button id="save" type="submit" class="btn btn-large btn-success">save</button>
-			<button id="cancel" class="btn btn-large btn-danger">cancel</button>
+			<button id="create" type="submit" class="btn btn-large btn-success">create</button>
+			<button id="calcel" class="btn btn-large">cancel</button>
 		</div>
 	</div>
-	<textarea id="editor" name="content">{{ $page->content }}</textarea>
+	<textarea id="editor" name="content">{{ Input::old('content') }}</textarea>
 </form>
 @stop

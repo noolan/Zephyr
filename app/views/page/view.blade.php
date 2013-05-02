@@ -3,7 +3,5 @@
 @section('content')
 @parent
 
-<h1>{{ $page->name }}</h1>
-
-<div>{{ $page->content }}</div>
+<div style="margin-top:30px;">{{ $page->content }}</div>
 @stop

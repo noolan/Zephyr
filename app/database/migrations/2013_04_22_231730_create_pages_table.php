@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
 class CreatePagesTable extends Migration {
@@ -11,7 +12,7 @@ class CreatePagesTable extends Migration {
 	 */
 	public function up()
 	{
-		Schema::create('pages', function($table)
+		Schema::create('pages', function(Blueprint $table)
 		{
 			$table->engine = 'MyISAM';
 			$table->increments('id');

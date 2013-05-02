@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
 class CreateLanguagesTable extends Migration {
@@ -11,7 +12,7 @@ class CreateLanguagesTable extends Migration {
 	 */
 	public function up()
 	{
-		Schema::create('languages', function($table)
+		Schema::create('languages', function(Blueprint $table)
 		{
 			$table->engine = 'MyISAM';
 			$table->increments('id');
