@@ -14,9 +14,8 @@ class CreateItemsTable extends Migration {
 	{
 		Schema::create('items', function(Blueprint $table)
 		{
-			$table->engine = 'MyISAM';
 			$table->increments('id');
-			$table->integer('stream_id')->unsigned()->index();
+			$table->integer('collection_id')->unsigned()->index();
 			$table->timestamps();
 		});
 	}

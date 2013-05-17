@@ -17,8 +17,8 @@ class MakeRevisionsTablePolymorphic extends Migration {
 			$table->dropIndex('revisions_page_id_index');
 			$table->dropColumn('page_id');
 
-			$table->dropIndex('revisions_stream_id_index');
-			$table->dropColumn('stream_id');
+			$table->dropIndex('revisions_collection_id_index');
+			$table->dropColumn('collection_id');
 
 			$table->dropIndex('revisions_item_id_index');
 			$table->dropColumn('item_id');
@@ -43,7 +43,7 @@ class MakeRevisionsTablePolymorphic extends Migration {
 			$table->dropColumn('revised_type');
 
 			$table->integer('page_id')->unsigned()->nullable()->index();
-			$table->integer('stream_id')->unsigned()->nullable()->index();
+			$table->integer('collection_id')->unsigned()->nullable()->index();
 			$table->integer('item_id')->unsigned()->nullable()->index();
 		});
 	}

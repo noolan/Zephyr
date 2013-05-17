@@ -11,12 +11,12 @@ class PageTableSeeder extends Seeder {
 				'english' => array(
 					'name'        => 'Home',
 					'slug'        => 'home',
-					'content'     => 'Welcome to Zephyr'
+					'content'     => 'Welcome to FNTC'
 				),
 				'francais' => array(
 					'name'        => 'Accueil',
 					'slug'        => 'accueil',
-					'content'     => 'Bienvenue au Zéphyr'
+					'content'     => 'Bienvenue à la CFPN'
 				)
 			)
 		));

@@ -2,7 +2,7 @@
 
 class Revision extends Eloquent {
 	
-	protected $table = 'revisions';
+	protected $table   = 'revisions';
 	protected $guarded = array('id');
 	public $timestamps = true;
 
@@ -13,18 +13,24 @@ class Revision extends Eloquent {
 	public function scopePages($query) {
 		return $query->where('revised_type', 'Page')
 		             ->where('language_id', Language::current()->id)
-		             ->orderBy('created_at');
+		             ->orderBy('created_at', 'DESC');
 	}
 
-	public function scopeStreams($query) {
-		return $query->where('revised_type', 'Stream')
+	public function scopeCategories($query) {
+		return $query->where('revised_type', 'Category')
 		             ->where('language_id', Language::current()->id)
-		             ->orderBy('created_at');
+		             ->orderBy('created_at', 'DESC');
+	}
+
+	public function scopeCollection($query) {
+		return $query->where('revised_type', 'Collection')
+		             ->where('language_id', Language::current()->id)
+		             ->orderBy('created_at', 'DESC');
 	}
 
 	public function scopeItems($query) {
 		return $query->where('revised_type', 'Item')
 		             ->where('language_id', Language::current()->id)
-		             ->orderBy('created_at');
+		             ->orderBy('created_at', 'DESC');
 	}
 }

@@ -5,11 +5,11 @@ class SettingTableSeeder extends Seeder {
 	public function run() {
 		DB::table('settings')->delete();
 
-		Setting::siteName('Gusting Gesticulations', Language::getId('en'));
-		Setting::siteNameExtended('and other windy warblings', Language::getId('en'));
+		Setting::siteName('First Nations Tax Commission', Language::getId('en'));
+		Setting::siteNameExtended('Commission de la fiscalité des premières nations', Language::getId('en'));
 
-		Setting::siteName('gesticulations rafales', Language::getId('français'));
-		Setting::siteNameExtended('de vent et d\'autres gazouillements', Language::getId('fr'));
+		Setting::siteName('Commission de la fiscalité des premières nations', Language::getId('français'));
+		Setting::siteNameExtended('First Nations Tax Commission', Language::getId('fr'));
 
 	}
 }

@@ -3,7 +3,7 @@
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
-class CreateStreamsTable extends Migration {
+class CreateCollectionsTable extends Migration {
 
 	/**
 	 * Run the migrations.
@@ -12,10 +12,11 @@ class CreateStreamsTable extends Migration {
 	 */
 	public function up()
 	{
-		Schema::create('streams', function(Blueprint $table)
+		Schema::create('collections', function(Blueprint $table)
 		{
-			$table->engine = 'MyISAM';
 			$table->increments('id');
+			$table->integer('type')->default(Collection::BLOG);
+			$table->string('item_sort')->default('created_at DESC');
 		});
 	}
 
@@ -26,7 +27,7 @@ class CreateStreamsTable extends Migration {
 	 */
 	public function down()
 	{
-		Schema::drop('streams');
+		Schema::drop('collections');
 	}
 
 }

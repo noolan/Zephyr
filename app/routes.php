@@ -1,6 +1,5 @@
 <?php
 
-
 /*
 |--------------------------------------------------------------------------
 | Redirection Routes
@@ -45,7 +44,6 @@ Route::get('{lang}/logout', function($lang) {
 });
 
 
-
 /*
 |--------------------------------------------------------------------------
 | New Page Routes
@@ -85,7 +83,8 @@ Route::get('{lang}/{page}', function($lang, $page) {
 
 	if (Auth::check())
 		return View::make('page.edit')->with('title', $page->name)
-	                                ->with('page',  $page);
+	                                ->with('page',  $page)
+	                                ->with('revisions', $page->revisions()->pages()->get());
 	else
 		return View::make('page.view')->with('title', $page->name)->with('page',  $page);
 });
@@ -94,7 +93,7 @@ Route::post('{lang}/{page}', function($lang, $page) {
 	$page = Page::findBySlug($page);
 
 	$page->revise(array(
-		'language_id' => Language::getId($lang),
+		'language_id' => Input::get('language'),
 		'name'        => Input::get('name'),
 		'slug'        => Str::slug(Input::get('name')),
 		'content'     => Input::get('content')
@@ -102,6 +101,13 @@ Route::post('{lang}/{page}', function($lang, $page) {
 
 	return Redirect::to($lang.'/'.$page->slug);
 });
+
+
+/*
+|--------------------------------------------------------------------------
+| Edit Page by Id Routes
+|--------------------------------------------------------------------------
+*/
 
 Route::get('{lang}/page/{id}', function($lang, $id) {
 	$page = Page::findOrFail($id);
@@ -117,7 +123,7 @@ Route::post('{lang}/page/{id}', function($lang, $id) {
 	$page = Page::findOrFail($id);
 
 	$page->revise(array(
-		'language_id' => Language::getId($lang),
+		'language_id' => Input::get('language'),
 		'name'        => Input::get('name'),
 		'slug'        => Str::slug(Input::get('name')),
 		'content'     => Input::get('content')

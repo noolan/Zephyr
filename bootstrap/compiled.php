@@ -551,6 +551,18 @@ interface HttpKernelInterface
      */
     public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true);
 }
+namespace Illuminate\Support\Contracts;
+
+interface ResponsePreparerInterface
+{
+    /**
+     * Prepare the given value as a Response object.
+     *
+     * @param  mixed  $value
+     * @return \Symfony\Component\HttpFoundation\Response
+     */
+    public function prepareResponse($value);
+}
 namespace Illuminate\Foundation;
 
 use Closure;
@@ -560,6 +572,7 @@ use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Container\Container;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Events\EventServiceProvider;
 use Illuminate\Routing\RoutingServiceProvider;
@@ -568,11 +581,12 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Illuminate\Support\Contracts\ResponsePreparerInterface;
 use Symfony\Component\HttpKernel\Exception\FatalErrorException;
 use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-class Application extends Container implements HttpKernelInterface
+class Application extends Container implements HttpKernelInterface, ResponsePreparerInterface
 {
     /**
      * The Laravel framework version.
@@ -681,27 +695,14 @@ class Application extends Container implements HttpKernelInterface
         return '/home/nolan/Sites/zephyr/vendor/laravel/framework/src/Illuminate/Foundation' . '/start.php';
     }
     /**
-     * Register the aliased class loader.
-     *
-     * @param  array  $aliases
-     * @return void
-     */
-    public function registerAliasLoader(array $aliases)
-    {
-        $loader = AliasLoader::getInstance($aliases);
-        $loader->register();
-    }
-    /**
      * Start the exception handling for the request.
      *
      * @return void
      */
     public function startExceptionHandling()
     {
-        $provider = array_first($this->serviceProviders, function ($key, $provider) {
-            return $provider instanceof ExceptionServiceProvider;
-        });
-        $provider->startHandling($this);
+        $this['exception']->register($this->environment());
+        $this['exception']->setDebug($this['config']['app.debug']);
     }
     /**
      * Get the current application environment.
@@ -871,10 +872,23 @@ class Application extends Container implements HttpKernelInterface
         if (!isset($this->loadedProviders[$provider])) {
             $this->register($instance = new $provider($this));
             unset($this->deferredServices[$service]);
-            if ($this->booted) {
-                $instance->boot();
-            }
+            $this->setupDeferredBoot($instance);
         }
+    }
+    /**
+     * Handle the booting of a deferred service provider.
+     *
+     * @param  \Illuminate\Support\ServiceProvider  $instance
+     * @return void
+     */
+    protected function setupDeferredBoot($instance)
+    {
+        if ($this->booted) {
+            return $instance->boot();
+        }
+        $this->booting(function () use($instance) {
+            $instance->boot();
+        });
     }
     /**
      * Resolve the given type from the container.
@@ -966,7 +980,12 @@ class Application extends Container implements HttpKernelInterface
      */
     public function dispatch(Request $request)
     {
-        return $this['router']->dispatch($this->prepareRequest($request));
+        if ($this->isDownForMaintenance()) {
+            $response = $this['events']->until('illuminate.app.down');
+            return $this->prepareResponse($response, $request);
+        } else {
+            return $this['router']->dispatch($this->prepareRequest($request));
+        }
     }
     /**
      * Handle the given request and get the response.
@@ -983,7 +1002,27 @@ class Application extends Container implements HttpKernelInterface
     public function handle(SymfonyRequest $request, $type = HttpKernelInterface::MASTER_REQUEST, $catch = true)
     {
         $this['request'] = $request;
+        Facade::clearResolvedInstance('request');
         return $this->dispatch($request);
+    }
+    /**
+     * Determine if the application is currently down for maintenance.
+     *
+     * @return bool
+     */
+    public function isDownForMaintenance()
+    {
+        return file_exists($this['path'] . '/storage/meta/down');
+    }
+    /**
+     * Register a maintenance mode event listener.
+     *
+     * @param  \Closure  $callback
+     * @return void
+     */
+    public function down(Closure $callback)
+    {
+        $this['events']->listen('illuminate.app.down', $callback);
     }
     /**
      * Boot the application's service providers.
@@ -1056,15 +1095,14 @@ class Application extends Container implements HttpKernelInterface
      * Prepare the given value as a Response object.
      *
      * @param  mixed  $value
-     * @param  \Illuminate\Http\Request  $request
      * @return \Symfony\Component\HttpFoundation\Response
      */
-    public function prepareResponse($value, Request $request)
+    public function prepareResponse($value)
     {
         if (!$value instanceof SymfonyResponse) {
             $value = new Response($value);
         }
-        return $value->prepare($request);
+        return $value->prepare($this['request']);
     }
     /**
      * Set the current application locale.
@@ -1341,8 +1379,12 @@ class Request extends \Symfony\Component\HttpFoundation\Request
      */
     public function only($keys)
     {
+        $results = array();
         $keys = is_array($keys) ? $keys : func_get_args();
-        return array_intersect_key($this->input(), array_flip((array) $keys));
+        foreach ($keys as $key) {
+            $results[$key] = $this->get($key);
+        }
+        return $results;
     }
     /**
      * Get all of the input except for a specified array of items.
@@ -1353,7 +1395,11 @@ class Request extends \Symfony\Component\HttpFoundation\Request
     public function except($keys)
     {
         $keys = is_array($keys) ? $keys : func_get_args();
-        return array_diff_key($this->input(), array_flip((array) $keys));
+        $results = $this->input();
+        foreach ($keys as $key) {
+            array_forget($results, $key);
+        }
+        return $results;
     }
     /**
      * Retrieve a query string item from the request.
@@ -4943,27 +4989,9 @@ use Whoops\Handler\PrettyPageHandler;
 use Whoops\Handler\JsonResponseHandler;
 use Illuminate\Support\ServiceProvider;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Debug\ErrorHandler;
-use Symfony\Component\HttpKernel\Debug\ExceptionHandler as KernelHandler;
+use Symfony\Component\Debug\ExceptionHandler as KernelHandler;
 class ExceptionServiceProvider extends ServiceProvider
 {
-    /**
-     * Start the error handling facilities.
-     *
-     * @param  \Illuminate\Foundation\Application  $app
-     * @return void
-     */
-    public function startHandling($app)
-    {
-        $this->setExceptionHandler($app['exception.function']);
-        // By registering the error handler with a level of -1, we state that we want
-        // all PHP errors converted into ErrorExceptions and thrown which provides
-        // a very strict development environment but prevents any unseen errors.
-        $app['kernel.error']->register(-1);
-        if (isset($app['env']) and $app['env'] != 'testing') {
-            $this->registerShutdownHandler();
-        }
-    }
     /**
      * Register the service provider.
      *
@@ -4971,62 +4999,52 @@ class ExceptionServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->registerKernelHandlers();
-        $this->app['exception'] = $this->app->share(function () {
-            return new Handler();
+        $this->registerDisplayers();
+        $this->registerHandler();
+    }
+    /**
+     * Register the exception displayers.
+     *
+     * @return void
+     */
+    protected function registerDisplayers()
+    {
+        $this->registerPlainDisplayer();
+        $this->registerDebugDisplayer();
+    }
+    /**
+     * Register the exception handler instance.
+     *
+     * @return void
+     */
+    protected function registerHandler()
+    {
+        $this->app['exception'] = $this->app->share(function ($app) {
+            return new Handler($app, $app['exception.plain'], $app['exception.debug']);
         });
-        $this->registerExceptionHandler();
+    }
+    /**
+     * Register the plain exception displayer.
+     *
+     * @return void
+     */
+    protected function registerPlainDisplayer()
+    {
+        $this->app['exception.plain'] = $this->app->share(function ($app) {
+            $handler = new KernelHandler($app['config']['app.debug']);
+            return new SymfonyDisplayer($handler);
+        });
+    }
+    /**
+     * Register the Whoops exception displayer.
+     *
+     * @return void
+     */
+    protected function registerDebugDisplayer()
+    {
         $this->registerWhoops();
-    }
-    /**
-     * Register the HttpKernel error and exception handlers.
-     *
-     * @return void
-     */
-    protected function registerKernelHandlers()
-    {
-        $app = $this->app;
-        $app['kernel.error'] = function () {
-            return new ErrorHandler();
-        };
-        $this->app['kernel.exception'] = function () use($app) {
-            return new KernelHandler($app['config']['app.debug']);
-        };
-    }
-    /**
-     * Register the PHP exception handler function.
-     *
-     * @return void
-     */
-    protected function registerExceptionHandler()
-    {
-        list($me, $app) = array($this, $this->app);
-        $app['exception.function'] = function () use($me, $app) {
-            return function ($exception) use($me, $app) {
-                $response = $app['exception']->handle($exception);
-                // If one of the custom error handlers returned a response, we will send that
-                // response back to the client after preparing it. This allows a specific
-                // type of exceptions to handled by a Closure giving great flexibility.
-                if (!is_null($response)) {
-                    $response = $app->prepareResponse($response, $app['request']);
-                    $response->send();
-                } else {
-                    $me->displayException($exception);
-                }
-            };
-        };
-    }
-    /**
-     * Register the shutdown handler Closure.
-     *
-     * @return void
-     */
-    protected function registerShutdownHandler()
-    {
-        $app = $this->app;
-        register_shutdown_function(function () use($app) {
-            set_exception_handler(array(new StubShutdownHandler($app), 'handle'));
-            $app['kernel.error']->handleFatal();
+        $this->app['exception.debug'] = $this->app->share(function ($app) {
+            return new WhoopsDisplayer($app['whoops']);
         });
     }
     /**
@@ -5038,9 +5056,10 @@ class ExceptionServiceProvider extends ServiceProvider
     {
         $this->registerWhoopsHandler();
         $this->app['whoops'] = $this->app->share(function ($app) {
-            $whoops = new \Whoops\Run();
-            $whoops->writeToOutput(false);
-            $whoops->allowQuit(false);
+            // We will instruct Whoops to not exit after it displays the exception as it
+            // will otherwise run out before we can do anything else. We just want to
+            // let the framework go ahead and finish a request on this end instead.
+            with($whoops = new \Whoops\Run())->allowQuit(false);
             return $whoops->pushHandler($app['whoops.handler']);
         });
     }
@@ -5069,6 +5088,9 @@ class ExceptionServiceProvider extends ServiceProvider
         $me = $this;
         $this->app['whoops.handler'] = function () use($me) {
             with($handler = new PrettyPageHandler())->setEditor('sublime');
+            // If the resource path exists, we will register the resource path with Whoops
+            // so our custom Laravel branded exception pages will be used when they are
+            // displayed back to the developer. Otherwise, the default pages are run.
             if (!is_null($path = $me->resourcePath())) {
                 $handler->setResourcesPath($path);
             }
@@ -5082,45 +5104,19 @@ class ExceptionServiceProvider extends ServiceProvider
      */
     public function resourcePath()
     {
-        if (is_dir($path = $this->app['path.base'] . '/vendor/laravel/framework/src/Illuminate/Exception/resources')) {
+        if (is_dir($path = $this->getResourcePath())) {
             return $path;
         }
     }
     /**
-     * Display the given exception.
+     * Get the Whoops custom resource path.
      *
-     * @param  \Exception  $exception
-     * @return void
+     * @return string
      */
-    public function displayException($exception)
+    protected function getResourcePath()
     {
-        if ($this->app['config']['app.debug']) {
-            return $this->displayWhoopsException($exception);
-        }
-        $this->app['kernel.exception']->handle($exception);
-    }
-    /**
-     * Display a exception using the Whoops library.
-     *
-     * @param  \Exception  $exception
-     * @return void
-     */
-    protected function displayWhoopsException($exception)
-    {
-        $response = $this->app['whoops']->handleException($exception);
-        with(new Response($response, 500))->send();
-    }
-    /**
-     * Set the given Closure as the exception handler.
-     *
-     * This function is mainly needed for mocking purposes.
-     *
-     * @param  Closure  $handler
-     * @return mixed
-     */
-    protected function setExceptionHandler(Closure $handler)
-    {
-        return set_exception_handler($handler);
+        $base = $this->app['path.base'];
+        return $base . '/vendor/laravel/framework/src/Illuminate/Exception/resources';
     }
 }
 namespace Illuminate\Routing;
@@ -5305,6 +5301,16 @@ abstract class Facade
             return static::$resolvedInstance[$name];
         }
         return static::$resolvedInstance[$name] = static::$app[$name];
+    }
+    /**
+     * Clear a resolved facade instance.
+     *
+     * @param  string  $name
+     * @return void
+     */
+    public static function clearResolvedInstance($name)
+    {
+        unset(static::$resolvedInstance[$name]);
     }
     /**
      * Clear all of the resolved instances.
@@ -7694,9 +7700,10 @@ class Router
      *
      * @param  string  $uri
      * @param  string  $controller
+     * @param  array   $names
      * @return \Illuminate\Routing\Route
      */
-    public function controller($uri, $controller)
+    public function controller($uri, $controller, $names = array())
     {
         $routable = $this->getInspector()->getRoutable($controller, $uri);
         // When a controller is routed using this method, we use Reflection to parse
@@ -7704,7 +7711,14 @@ class Router
         // route explicitly for the developers, so reverse routing is possible.
         foreach ($routable as $method => $routes) {
             foreach ($routes as $route) {
-                $this->{$route['verb']}($route['uri'], $controller . '@' . $method);
+                $action = array('uses' => $controller . '@' . $method);
+                // If a given controller method has been named, we will assign the name to
+                // the controller action array. This provides for a short-cut to method
+                // naming, so you don't have to define an individual route for these.
+                if (isset($names[$method])) {
+                    $action['as'] = $names[$method];
+                }
+                $this->{$route['verb']}($route['uri'], $action);
             }
         }
         $this->addFallthroughRoute($controller, $uri);
@@ -8515,7 +8529,7 @@ class Router
      */
     public function model($key, $class, Closure $callback = null)
     {
-        return $this->bind($key, function ($value) use($class) {
+        return $this->bind($key, function ($value) use($class, $callback) {
             if (is_null($value)) {
                 return null;
             }
@@ -9074,6 +9088,12 @@ class Dispatcher
      */
     protected $listeners = array();
     /**
+     * The wildcard listeners.
+     *
+     * @var array
+     */
+    protected $wildcards = array();
+    /**
      * The sorted event listeners.
      *
      * @var array
@@ -9115,11 +9135,7 @@ class Dispatcher
      */
     protected function setupWildcardListen($event, $listener, $priority)
     {
-        foreach (array_keys($this->listeners) as $key) {
-            if (str_is($event, $key)) {
-                $this->listen($key, $listener, $priority);
-            }
-        }
+        $this->wildcards[$event][] = $listener;
     }
     /**
      * Determine if a given event has listeners.
@@ -9234,10 +9250,27 @@ class Dispatcher
      */
     public function getListeners($eventName)
     {
+        $wildcards = $this->getWildcardListeners($eventName);
         if (!isset($this->sorted[$eventName])) {
             $this->sortListeners($eventName);
         }
-        return $this->sorted[$eventName];
+        return array_merge($this->sorted[$eventName], $wildcards);
+    }
+    /**
+     * Get the wildcard listeners for the event.
+     *
+     * @param  string  $eventName
+     * @return array
+     */
+    protected function getWildcardListeners($eventName)
+    {
+        $wildcards = array();
+        foreach ($this->wildcards as $key => $listeners) {
+            if (str_is($key, $eventName)) {
+                $wildcards = array_merge($wildcards, $listeners);
+            }
+        }
+        return $wildcards;
     }
     /**
      * Sort the listeners for a given event by priority.
@@ -9416,6 +9449,12 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
      */
     public $exists = false;
     /**
+     * Indicates if the model should soft delete.
+     *
+     * @var bool
+     */
+    protected $softDelete = false;
+    /**
      * Indicates whether attributes are snake cased on arrays.
      *
      * @var bool
@@ -9463,6 +9502,12 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
      * @var string
      */
     const UPDATED_AT = 'updated_at';
+    /**
+     * The name of the "deleted at" column.
+     *
+     * @var string
+     */
+    const DELETED_AT = 'deleted_at';
     /**
      * Create a new Eloquent model instance.
      *
@@ -9840,8 +9885,49 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
             // for the models. This will allow any caching to get broken on the parents
             // by the timestamp. Then we will go ahead and delete the model instance.
             $this->touchOwners();
-            $this->newQuery()->where($this->getKeyName(), $this->getKey())->delete();
+            $this->performDeleteOnModel();
             $this->fireModelEvent('deleted', false);
+        }
+    }
+    /**
+     * Force a hard delete on a soft deleted model.
+     *
+     * @return void
+     */
+    public function forceDelete()
+    {
+        $softDelete = $this->softDelete;
+        // We will temporarily disable false delete to allow us to perform the real
+        // delete operation against the model. We will then restore the deleting
+        // state to what this was prior to this given hard deleting operation.
+        $this->softDelete = false;
+        $this->delete();
+        $this->softDelete = $softDelete;
+    }
+    /**
+     * Perform the actual delete query on this model instance.
+     *
+     * @return void
+     */
+    protected function performDeleteOnModel()
+    {
+        $query = $this->newQuery()->where($this->getKeyName(), $this->getKey());
+        if ($this->softDelete) {
+            $query->update(array(static::DELETED_AT => new DateTime()));
+        } else {
+            $query->delete();
+        }
+    }
+    /**
+     * Restore a soft-deleted model instance.
+     *
+     * @return void
+     */
+    public function restore()
+    {
+        if ($this->softDelete) {
+            $this->{static::DELETED_AT} = null;
+            return $this->save();
         }
     }
     /**
@@ -9997,7 +10083,7 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
      */
     public function save(array $options = array())
     {
-        $query = $this->newQuery();
+        $query = $this->newQueryWithDeleted();
         // If the "saving" event returns false we'll bail out of the save and return
         // false, indicating that the save failed. This gives an opportunities to
         // listeners to cancel save operations if validations fail or whatever.
@@ -10215,6 +10301,24 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
         return static::UPDATED_AT;
     }
     /**
+     * Get the name of the "deleted at" column.
+     *
+     * @return string
+     */
+    public function getDeletedAtColumn()
+    {
+        return static::DELETED_AT;
+    }
+    /**
+     * Get the fully qualified "deleted at" column.
+     *
+     * @return string
+     */
+    public function getQualifiedDeletedAtColumn()
+    {
+        return $this->getTable() . '.' . $this->getDeletedAtColumn();
+    }
+    /**
      * Get a fresh timestamp for the model.
      *
      * @return mixed
@@ -10226,16 +10330,48 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
     /**
      * Get a new query builder for the model's table.
      *
+     * @param  bool  $excludeDeleted
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function newQuery()
+    public function newQuery($excludeDeleted = true)
     {
         $builder = new Builder($this->newBaseQueryBuilder());
         // Once we have the query builders, we will set the model instances so the
         // builder can easily access any information it may need from the model
         // while it is constructing and executing various queries against it.
         $builder->setModel($this)->with($this->with);
+        if ($excludeDeleted and $this->softDelete) {
+            $builder->whereNull($this->getQualifiedDeletedAtColumn());
+        }
         return $builder;
+    }
+    /**
+     * Get a new query builder that includes soft deletes.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function newQueryWithDeleted()
+    {
+        return $this->newQuery(false);
+    }
+    /**
+     * Get a new query builder that includes soft deletes.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public static function withTrashed()
+    {
+        return with(new static())->newQueryWithDeleted();
+    }
+    /**
+     * Get a new query builder that only includes soft deletes.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public static function trashed()
+    {
+        $column = $this->getQualifiedDeletedAtColumn();
+        return $this->newQueryWithDeleted()->whereNotNull($column);
     }
     /**
      * Get a new query builder instance for the connection.
@@ -10315,6 +10451,25 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
     public function usesTimestamps()
     {
         return $this->timestamps;
+    }
+    /**
+     * Determine if the model instance uses soft deletes.
+     *
+     * @return bool
+     */
+    public function isSoftDeleting()
+    {
+        return $this->softDelete;
+    }
+    /**
+     * Set the soft deleting property on the model.
+     *
+     * @param  bool  $enabled
+     * @return void
+     */
+    public function setSoftDeleting($enabled)
+    {
+        $this->softDelete = $enabled;
     }
     /**
      * Get the polymorphic relationship columns.
@@ -10773,6 +10928,17 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
         return $this->getConnection()->getQueryGrammar()->getDateFormat();
     }
     /**
+     * Clone the model into a new, non-existing instance.
+     *
+     * @return \Illuminate\Database\Eloquent\Model
+     */
+    public function replicate()
+    {
+        $attributes = array_except($this->attributes, array($this->getKeyName()));
+        with($instance = new static())->setRawAttributes($attributes);
+        return $instance->setRelations($this->relations);
+    }
+    /**
      * Get all of the current attributes on the model.
      *
      * @return array
@@ -10851,6 +11017,17 @@ abstract class Model implements ArrayAccess, ArrayableInterface, JsonableInterfa
     public function setRelation($relation, $value)
     {
         $this->relations[$relation] = $value;
+    }
+    /**
+     * Set the entire relations array on the model.
+     *
+     * @param  array  $relations
+     * @return \Illuminate\Database\Eloquent\Model
+     */
+    public function setRelations(array $relations)
+    {
+        $this->relations = $relations;
+        return $this;
     }
     /**
      * Get the database connection for the model.
@@ -13544,17 +13721,241 @@ class App extends Facade
 }
 namespace Illuminate\Exception;
 
+use Exception;
+interface ExceptionDisplayerInterface
+{
+    /**
+     * Display the given exception to the user.
+     *
+     * @param  \Exception  $exception
+     */
+    public function display(Exception $exception);
+}
+namespace Illuminate\Exception;
+
+use Exception;
+use Symfony\Component\Debug\ExceptionHandler;
+class SymfonyDisplayer implements ExceptionDisplayerInterface
+{
+    /**
+     * The Symfony exception handler.
+     *
+     * @var \Symfony\Component\Debug\ExceptionHandler
+     */
+    protected $symfony;
+    /**
+     * Create a new Symfony exception displayer.
+     *
+     * @param  \Symfony\Component\Debug\ExceptionHandler  $symfony
+     * @return void
+     */
+    public function __construct(ExceptionHandler $symfony)
+    {
+        $this->symfony = $symfony;
+    }
+    /**
+     * Display the given exception to the user.
+     *
+     * @param  \Exception  $exception
+     */
+    public function display(Exception $exception)
+    {
+        $this->symfony->handle($exception);
+    }
+}
+namespace Illuminate\Exception;
+
+use Exception;
+use Whoops\Run;
+class WhoopsDisplayer implements ExceptionDisplayerInterface
+{
+    /**
+     * Create a new Whoops exception displayer.
+     *
+     * @param  \Whoops\Run  $whoops
+     * @return void
+     */
+    public function __construct(Run $whoops)
+    {
+        $this->whoops = $whoops;
+    }
+    /**
+     * Display the given exception to the user.
+     *
+     * @param  \Exception  $exception
+     */
+    public function display(Exception $exception)
+    {
+        $this->whoops->handleException($exception);
+    }
+}
+namespace Illuminate\Exception;
+
 use Closure;
+use ErrorException;
 use ReflectionFunction;
+use Illuminate\Support\Contracts\ResponsePreparerInterface;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\Debug\Exception\FatalErrorException as FatalError;
 class Handler
 {
+    /**
+     * The response preparer implementation.
+     *
+     * @var \Illuminate\Support\Contracts\ResponsePreparerInterface
+     */
+    protected $responsePreparer;
+    /**
+     * The plain exception displayer.
+     *
+     * @var \Illuminate\Exception\ExceptionDisplayerInterface
+     */
+    protected $plainDisplayer;
+    /**
+     * The debug exception displayer.
+     *
+     * @var \Illuminate\Exception\ExceptionDisplayerInterface
+     */
+    protected $debugDisplayer;
+    /**
+     * Indicates if the application is in debug mode.
+     *
+     * @var bool
+     */
+    protected $debug;
     /**
      * All of the register exception handlers.
      *
      * @var array
      */
     protected $handlers = array();
+    /**
+     * All of the handled error messages.
+     *
+     * @var array
+     */
+    protected $handled = array();
+    /**
+     * Create a new error handler instance.
+     *
+     * @param  \Illuminate\Support\Contracts\ResponsePreparerInterface  $responsePreparer
+     * @param  \Illuminate\Exception\ExceptionDisplayerInterface  $plainDisplayer
+     * @param  \Illuminate\Exception\ExceptionDisplayerInterface  $debugDisplayer
+     * @return void
+     */
+    public function __construct(ResponsePreparerInterface $responsePreparer, ExceptionDisplayerInterface $plainDisplayer, ExceptionDisplayerInterface $debugDisplayer, $debug = true)
+    {
+        $this->debug = $debug;
+        $this->plainDisplayer = $plainDisplayer;
+        $this->debugDisplayer = $debugDisplayer;
+        $this->responsePreparer = $responsePreparer;
+    }
+    /**
+     * Register the exception / error handlers for the application.
+     *
+     * @param  string  $environment
+     * @return void
+     */
+    public function register($environment)
+    {
+        $this->registerErrorHandler();
+        $this->registerExceptionHandler();
+        if ($environment != 'testing') {
+            $this->registerShutdownHandler();
+        }
+    }
+    /**
+     * Register the PHP error handler.
+     *
+     * @return void
+     */
+    protected function registerErrorHandler()
+    {
+        set_error_handler(array($this, 'handleError'));
+    }
+    /**
+     * Register the PHP exception handler.
+     *
+     * @return void
+     */
+    protected function registerExceptionHandler()
+    {
+        set_exception_handler(array($this, 'handleException'));
+    }
+    /**
+     * Register the PHP shutdown handler.
+     *
+     * @return void
+     */
+    protected function registerShutdownHandler()
+    {
+        register_shutdown_function(array($this, 'handleShutdown'));
+    }
+    /**
+     * Handle a PHP error for the application.
+     *
+     * @param  int     $level
+     * @param  string  $message
+     * @param  string  $file
+     * @param  int     $line
+     * @param  array   $context
+     */
+    public function handleError($level, $message, $file, $line, $context)
+    {
+        if (error_reporting() & $level) {
+            $e = new ErrorException($message, $level, 0, $file, $line);
+            $this->handleException($e);
+        }
+    }
+    /**
+     * Handle an exception for the application.
+     *
+     * @param  \Exception  $exception
+     * @return void
+     */
+    public function handleException($exception)
+    {
+        $response = $this->callCustomHandlers($exception);
+        // If one of the custom error handlers returned a response, we will send that
+        // response back to the client after preparing it. This allows a specific
+        // type of exceptions to handled by a Closure giving great flexibility.
+        if (!is_null($response)) {
+            $response = $this->prepareResponse($response);
+            $response->send();
+        } else {
+            $this->displayException($exception);
+        }
+        $this->bail();
+    }
+    /**
+     * Handle the PHP shutdown event.
+     *
+     * @return void
+     */
+    public function handleShutdown()
+    {
+        $error = error_get_last();
+        // If an error has occurred that has not been displayed, we will create a fatal
+        // error exception instance and pass it into the regular exception handling
+        // code so it can be displayed back out to the developer for information.
+        if (!is_null($error)) {
+            extract($error);
+            if (!$this->isFatal($type)) {
+                return;
+            }
+            $this->handleException(new FatalError($message, $type, 0, $file, $line));
+        }
+    }
+    /**
+     * Determine if the error type is fatal.
+     *
+     * @param  int   $type
+     * @return bool
+     */
+    protected function isFatal($type)
+    {
+        return in_array($type, array(E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE));
+    }
     /**
      * Handle a console exception.
      *
@@ -13563,7 +13964,7 @@ class Handler
      */
     public function handleConsole($exception)
     {
-        return $this->handle($exception, true);
+        return $this->callCustomHandlers($exception, true);
     }
     /**
      * Handle the given exception.
@@ -13572,35 +13973,45 @@ class Handler
      * @param  bool  $fromConsole
      * @return void
      */
-    public function handle($exception, $fromConsole = false)
+    protected function callCustomHandlers($exception, $fromConsole = false)
     {
         foreach ($this->handlers as $handler) {
-            // If this exception handler does not handle the given exception, we will
-            // just go the next one. A Handler may type-hint the exception that it
-            // will handle, allowing for more granularity on the error handling.
+            // If this exception handler does not handle the given exception, we will just
+            // go the next one. A handler may type-hint an exception that it handles so
+            //  we can have more granularity on the error handling for the developer.
             if (!$this->handlesException($handler, $exception)) {
                 continue;
-            }
-            if ($exception instanceof HttpExceptionInterface) {
+            } elseif ($exception instanceof HttpExceptionInterface) {
                 $code = $exception->getStatusCode();
             } else {
                 $code = 500;
             }
-            // We will wrap this handler in a try / catch and avoid white screens of
-            // death if any exceptions are thrown from a handler itself. This way
-            // we will at least log some errors, and avoid errors with no data.
+            // We will wrap this handler in a try / catch and avoid white screens of death
+            // if any exceptions are thrown from a handler itself. This way we will get
+            // at least some errors, and avoid errors with no data or not log writes.
             try {
                 $response = $handler($exception, $code, $fromConsole);
             } catch (\Exception $e) {
                 $response = $this->formatException($e);
             }
-            // If the handler returns a "non-null" response, we will return it so it
-            // will get sent back to the browsers. Once a handler returns a valid
-            // response we will cease iterating and calling the other handlers.
+            // If this handler returns a "non-null" response, we will return it so it will
+            // get sent back to the browsers. Once the handler returns a valid response
+            // we will cease iterating through them and calling these other handlers.
             if (isset($response) and !is_null($response)) {
                 return $response;
             }
         }
+    }
+    /**
+     * Display the given exception to the user.
+     *
+     * @param  \Exception  $exception
+     * @return void
+     */
+    protected function displayException($exception)
+    {
+        $displayer = $this->debug ? $this->debugDisplayer : $this->plainDisplayer;
+        $displayer->display($exception);
     }
     /**
      * Determine if the given handler handles this exception.
@@ -13647,6 +14058,35 @@ class Handler
     public function error(Closure $callback)
     {
         array_unshift($this->handlers, $callback);
+    }
+    /**
+     * Prepare the given response.
+     *
+     * @param  mixed  $response
+     * @return \Illuminate\Http\Response
+     */
+    protected function prepareResponse($response)
+    {
+        return $this->responsePreparer->prepareResponse($response);
+    }
+    /**
+     * Exit the application.
+     *
+     * @return void
+     */
+    protected function bail()
+    {
+        die(1);
+    }
+    /**
+     * Set the debug level for the handler.
+     *
+     * @param  bool  $debug
+     * @return void
+     */
+    public function setDebug($debug)
+    {
+        $this->debug = $debug;
     }
 }
 namespace Illuminate\Support\Facades;
@@ -14393,7 +14833,7 @@ class Route extends BaseRoute
     public function getParameters()
     {
         // If we have already parsed the parameters, we will just return the listing
-        // the we already parsed, as some of these may have been resolved through
+        // that we already parsed as some of these may have been resolved through
         // a binder that uses a database repository and shouldn't be run again.
         if (isset($this->parsedParameters)) {
             return $this->parsedParameters;
@@ -18446,5 +18886,495 @@ class Cookie
     public function isCleared()
     {
         return $this->expire < time();
+    }
+}
+/**
+ * Whoops - php errors for cool kids
+ * @author Filipe Dobreira <http://github.com/filp>
+ */
+namespace Whoops;
+
+use Whoops\Handler\HandlerInterface;
+use Whoops\Handler\Handler;
+use Whoops\Handler\CallbackHandler;
+use Whoops\Exception\Inspector;
+use Whoops\Exception\ErrorException;
+use InvalidArgumentException;
+use Exception;
+class Run
+{
+    const EXCEPTION_HANDLER = 'handleException';
+    const ERROR_HANDLER = 'handleError';
+    const SHUTDOWN_HANDLER = 'handleShutdown';
+    protected $isRegistered;
+    protected $allowQuit = true;
+    protected $sendOutput = true;
+    /**
+     * @var DarnIt\Handler\HandlerInterface[]
+     */
+    protected $handlerStack = array();
+    /**
+     * Pushes a handler to the end of the stack.
+     * @param  Whoops\HandlerInterface $handler
+     * @return Whoops\Run
+     */
+    public function pushHandler($handler)
+    {
+        if (is_callable($handler)) {
+            $handler = new CallbackHandler($handler);
+        }
+        if (!$handler instanceof HandlerInterface) {
+            throw new InvalidArgumentException('Argument to ' . __METHOD__ . ' must be a callable, or instance of' . 'Whoops\\Handler\\HandlerInterface');
+        }
+        $this->handlerStack[] = $handler;
+        return $this;
+    }
+    /**
+     * Removes the last handler in the stack and returns it.
+     * Returns null if there's nothing else to pop.
+     * @return null|Whoops\Handler\HandlerInterface
+     */
+    public function popHandler()
+    {
+        return array_pop($this->handlerStack);
+    }
+    /**
+     * Returns an array with all handlers, in the
+     * order they were added to the stack.
+     * @return array
+     */
+    public function getHandlers()
+    {
+        return $this->handlerStack;
+    }
+    /**
+     * Clears all handlers in the handlerStack, including
+     * the default PrettyPage handler.
+     * @return Whoops\Run
+     */
+    public function clearHandlers()
+    {
+        $this->handlerStack = array();
+        return $this;
+    }
+    /**
+     * @param  Exception $exception
+     * @return Whoops\Exception\Inspector
+     */
+    protected function getInspector(Exception $exception)
+    {
+        return new Inspector($exception);
+    }
+    /**
+     * Registers this instance as an error handler.
+     * @return Whoops\Run
+     */
+    public function register()
+    {
+        if (!$this->isRegistered) {
+            set_error_handler(array($this, self::ERROR_HANDLER));
+            set_exception_handler(array($this, self::EXCEPTION_HANDLER));
+            register_shutdown_function(array($this, self::SHUTDOWN_HANDLER));
+            $this->isRegistered = true;
+        }
+        return $this;
+    }
+    /**
+     * Unregisters all handlers registered by this Whoops\Run instance
+     * @return Whoops\Run
+     */
+    public function unregister()
+    {
+        if ($this->isRegistered) {
+            restore_exception_handler();
+            restore_error_handler();
+            $this->isRegistered = false;
+        }
+        return $this;
+    }
+    /**
+     * Should Whoops allow Handlers to force the script to quit?
+     * @param bool|num $exit
+     * @return bool
+     */
+    public function allowQuit($exit = null)
+    {
+        if (func_num_args() == 0) {
+            return $this->allowQuit;
+        }
+        return $this->allowQuit = (bool) $exit;
+    }
+    /**
+     * Should Whoops push output directly to the client?
+     * If this is false, output will be returned by handleException
+     * @param bool|num $send
+     * @return bool
+     */
+    public function writeToOutput($send = null)
+    {
+        if (func_num_args() == 0) {
+            return $this->sendOutput;
+        }
+        return $this->sendOutput = (bool) $send;
+    }
+    /**
+     * Handles an exception, ultimately generating a Whoops error
+     * page.
+     *
+     * @param  Exception $exception
+     * @return string Output generated by handlers
+     */
+    public function handleException(Exception $exception)
+    {
+        // Walk the registered handlers in the reverse order
+        // they were registered, and pass off the exception
+        $inspector = $this->getInspector($exception);
+        // Capture output produced while handling the exception,
+        // we might want to send it straight away to the client,
+        // or return it silently.
+        ob_start();
+        for ($i = count($this->handlerStack) - 1; $i >= 0; $i--) {
+            $handler = $this->handlerStack[$i];
+            $handler->setRun($this);
+            $handler->setInspector($inspector);
+            $handler->setException($exception);
+            $handlerResponse = $handler->handle($exception);
+            if (in_array($handlerResponse, array(Handler::LAST_HANDLER, Handler::QUIT))) {
+                // The Handler has handled the exception in some way, and
+                // wishes to quit execution (Handler::QUIT), or skip any
+                // other handlers (Handler::LAST_HANDLER). If $this->allowQuit
+                // is false, Handler::QUIT behaves like Handler::LAST_HANDLER
+                break;
+            }
+        }
+        $output = ob_get_clean();
+        // Handlers are done! Check if we got here because of Handler::QUIT
+        // ($handlerResponse will be the response from the last queried handler)
+        // and if so, try to quit execution.
+        if ($this->allowQuit()) {
+            echo $output;
+            die;
+        } else {
+            // If we're allowed to, send output generated by handlers directly
+            // to the output, otherwise, return it so that it may be used by
+            // the caller.
+            if ($this->writeToOutput()) {
+                echo $output;
+            }
+            return $output;
+        }
+    }
+    /**
+     * Converts generic PHP errors to \ErrorException
+     * instances, before passing them off to be handled.
+     *
+     * This method MUST be compatible with set_error_handler.
+     *
+     * @param int    $level
+     * @param string $message
+     * @param string $file
+     * @param int    $line
+     */
+    public function handleError($level, $message, $file = null, $line = null)
+    {
+        if ($level & error_reporting()) {
+            $this->handleException(new ErrorException($message, $level, 0, $file, $line));
+        }
+    }
+    /**
+     * Special case to deal with Fatal errors and the like.
+     */
+    public function handleShutdown()
+    {
+        if ($error = error_get_last()) {
+            $this->handleError($error['type'], $error['message'], $error['file'], $error['line']);
+        }
+    }
+}
+/**
+ * Whoops - php errors for cool kids
+ * @author Filipe Dobreira <http://github.com/filp>
+ */
+namespace Whoops\Handler;
+
+use Whoops\Handler\Handler;
+use InvalidArgumentException;
+class PrettyPageHandler extends Handler
+{
+    /**
+     * @var string
+     */
+    private $resourcesPath;
+    /**
+     * @var array[]
+     */
+    private $extraTables = array();
+    /**
+     * @var string
+     */
+    private $pageTitle = 'Whoops! There was an error.';
+    /**
+     * A string identifier for a known IDE/text editor, or a closure
+     * that resolves a string that can be used to open a given file
+     * in an editor. If the string contains the special substrings
+     * %file or %line, they will be replaced with the correct data.
+     *
+     * @example
+     *  "txmt://open?url=%file&line=%line"
+     * @var mixed $editor
+     */
+    protected $editor;
+    /**
+     * A list of known editor strings
+     * @var array
+     */
+    protected $editors = array('sublime' => 'subl://open?url=file://%file&line=%line', 'textmate' => 'txmt://open?url=file://%file&line=%line', 'emacs' => 'emacs://open?url=file://%file&line=%line', 'macvim' => 'mvim://open/?url=file://%file&line=%line');
+    /**
+     * @return int|null
+     */
+    public function handle()
+    {
+        // Check conditions for outputting HTML:
+        // @todo: make this more robust
+        if (php_sapi_name() === 'cli' && !isset($_ENV['whoops-test'])) {
+            return Handler::DONE;
+        }
+        // Get the 'pretty-template.php' template file
+        // @todo: this can be made more dynamic &&|| cleaned-up
+        if (!($resources = $this->getResourcesPath())) {
+            $resources = '/home/nolan/Sites/zephyr/vendor/filp/whoops/src/Whoops/Handler' . '/../Resources';
+        }
+        $templateFile = "{$resources}/pretty-template.php";
+        // @todo: Make this more reliable,
+        // possibly by adding methods to append CSS & JS to the page
+        $cssFile = "{$resources}/pretty-page.css";
+        // Prepare the $v global variable that will pass relevant
+        // information to the template
+        $inspector = $this->getInspector();
+        $frames = $inspector->getFrames();
+        $v = (object) array('title' => $this->getPageTitle(), 'name' => explode('\\', $inspector->getExceptionName()), 'message' => $inspector->getException()->getMessage(), 'frames' => $frames, 'hasFrames' => !!count($frames), 'handler' => $this, 'handlers' => $this->getRun()->getHandlers(), 'pageStyle' => file_get_contents($cssFile), 'tables' => array('Server/Request Data' => $_SERVER, 'GET Data' => $_GET, 'POST Data' => $_POST, 'Files' => $_FILES, 'Cookies' => $_COOKIE, 'Session' => isset($_SESSION) ? $_SESSION : array(), 'Environment Variables' => $_ENV));
+        // Add extra entries list of data tables:
+        $v->tables = array_merge($this->getDataTables(), $v->tables);
+        call_user_func(function () use($templateFile, $v) {
+            // $e -> cleanup output, optionally preserving URIs as anchors:
+            $e = function ($_, $allowLinks = false) {
+                $escaped = htmlspecialchars($_, ENT_QUOTES, 'UTF-8');
+                // convert URIs to clickable anchor elements:
+                if ($allowLinks) {
+                    $escaped = preg_replace('@([A-z]+?://([-\\w\\.]+[-\\w])+(:\\d+)?(/([\\w/_\\.#-]*(\\?\\S+)?[^\\.\\s])?)?)@', '<a href="$1" target="_blank">$1</a>', $escaped);
+                }
+                return $escaped;
+            };
+            // $slug -> sluggify string (i.e: Hello world! -> hello-world)
+            $slug = function ($_) {
+                $_ = str_replace(' ', '-', $_);
+                $_ = preg_replace('/[^\\w\\d\\-\\_]/i', '', $_);
+                return strtolower($_);
+            };
+            require $templateFile;
+        });
+        return Handler::QUIT;
+    }
+    /**
+     * Adds an entry to the list of tables displayed in the template.
+     * The expected data is a simple associative array. Any nested arrays
+     * will be flattened with print_r
+     * @param string $label
+     * @param array  $data
+     */
+    public function addDataTable($label, array $data)
+    {
+        $this->extraTables[$label] = $data;
+    }
+    /**
+     * Returns all the extra data tables registered with this handler.
+     * Optionally accepts a 'label' parameter, to only return the data
+     * table under that label.
+     * @param string|null $label
+     * @return array[]
+     */
+    public function getDataTables($label = null)
+    {
+        if ($label !== null) {
+            return isset($this->extraTables[$label]) ? $this->extraTables[$label] : array();
+        }
+        return $this->extraTables;
+    }
+    /**
+     * Adds an editor resolver, identified by a string
+     * name, and that may be a string path, or a callable
+     * resolver. If the callable returns a string, it will
+     * be set as the file reference's href attribute.
+     *
+     * @example
+     *  $run->addEditor('macvim', "mvim://open?url=file://%file&line=%line")
+     * @example
+     *   $run->addEditor('remove-it', function($file, $line) {
+     *       unlink($file);
+     *       return "http://stackoverflow.com";
+     *   });
+     * @param  string $identifier
+     * @param  string $resolver
+     */
+    public function addEditor($identifier, $resolver)
+    {
+        $this->editors[$identifier] = $resolver;
+    }
+    /**
+     * Set the editor to use to open referenced files, by a string
+     * identifier, or a callable that will be executed for every
+     * file reference, with a $file and $line argument, and should
+     * return a string.
+     *
+     * @example
+     *   $run->setEditor(function($file, $line) { return "file:///{$file}"; });
+     * @example
+     *   $run->setEditor('sublime');
+     *
+     * @param string|callable $editor
+     */
+    public function setEditor($editor)
+    {
+        if (!is_callable($editor) && !isset($this->editors[$editor])) {
+            throw new InvalidArgumentException("Unknown editor identifier: {$editor}. Known editors:" . array_join(',', array_keys($this->editors)));
+        }
+        $this->editor = $editor;
+    }
+    /**
+     * Given a string file path, and an integer file line,
+     * executes the editor resolver and returns, if available,
+     * a string that may be used as the href property for that
+     * file reference.
+     *
+     * @param  string $filePath
+     * @param  int    $line
+     * @return string|false
+     */
+    public function getEditorHref($filePath, $line)
+    {
+        if ($this->editor === null) {
+            return false;
+        }
+        $editor = $this->editor;
+        if (is_string($editor)) {
+            $editor = $this->editors[$editor];
+        }
+        if (is_callable($editor)) {
+            $editor = call_user_func($editor, $filePath, $line);
+        }
+        // Check that the editor is a string, and replace the
+        // %line and %file placeholders:
+        if (!is_string($editor)) {
+            throw new InvalidArgumentException(__METHOD__ . ' should always resolve to a string; got something else instead');
+        }
+        $editor = str_replace('%line', rawurlencode($line), $editor);
+        $editor = str_replace('%file', rawurlencode($filePath), $editor);
+        return $editor;
+    }
+    /**
+     * @var string
+     */
+    public function setPageTitle($title)
+    {
+        $this->pageTitle = (string) $title;
+    }
+    /**
+     * @return string
+     */
+    public function getPageTitle()
+    {
+        return $this->pageTitle;
+    }
+    /**
+     * @return string
+     */
+    public function getResourcesPath()
+    {
+        return $this->resourcesPath;
+    }
+    /**
+     * @param string $resourcesPath
+     */
+    public function setResourcesPath($resourcesPath)
+    {
+        if (!is_dir($resourcesPath)) {
+            throw new InvalidArgumentException("{$resourcesPath} is not a valid directory");
+        }
+        $this->resourcesPath = $resourcesPath;
+    }
+}
+/**
+ * Whoops - php errors for cool kids
+ * @author Filipe Dobreira <http://github.com/filp>
+ */
+namespace Whoops\Handler;
+
+use Whoops\Handler\Handler;
+/**
+ * Catches an exception and converts it to a JSON
+ * response. Additionally can also return exception
+ * frames for consumption by an API.
+ */
+class JsonResponseHandler extends Handler
+{
+    /**
+     * @var bool
+     */
+    private $returnFrames = false;
+    /**
+     * @var bool
+     */
+    private $onlyForAjaxRequests = false;
+    /**
+     * @param  bool|null $returnFrames
+     * @return null|bool
+     */
+    public function addTraceToOutput($returnFrames = null)
+    {
+        if (func_num_args() == 0) {
+            return $this->returnFrames;
+        }
+        $this->returnFrames = (bool) $returnFrames;
+    }
+    /**
+     * @param  bool|null $onlyForAjaxRequests
+     * @return null|bool
+     */
+    public function onlyForAjaxRequests($onlyForAjaxRequests = null)
+    {
+        if (func_num_args() == 0) {
+            return $this->onlyForAjaxRequests;
+        }
+        $this->onlyForAjaxRequests = (bool) $onlyForAjaxRequests;
+    }
+    /**
+     * Check, if possible, that this execution was triggered by an AJAX request.
+     * @param bool
+     */
+    private function isAjaxRequest()
+    {
+        return !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+    }
+    /**
+     * @return int
+     */
+    public function handle()
+    {
+        if ($this->onlyForAjaxRequests() && !$this->isAjaxRequest()) {
+            return Handler::DONE;
+        }
+        $exception = $this->getException();
+        $response = array('error' => array('type' => get_class($exception), 'message' => $exception->getMessage(), 'file' => $exception->getFile(), 'line' => $exception->getLine()));
+        if ($this->addTraceToOutput()) {
+            $inspector = $this->getInspector();
+            $frames = $inspector->getFrames();
+            $frameData = array();
+            foreach ($frames as $frame) {
+                $frameData[] = array('file' => $frame->getFile(), 'line' => $frame->getLine(), 'function' => $frame->getFunction(), 'class' => $frame->getClass(), 'args' => $frame->getArgs());
+            }
+            $response['error']['trace'] = $frameData;
+        }
+        echo json_encode($response);
+        return Handler::QUIT;
     }
 }

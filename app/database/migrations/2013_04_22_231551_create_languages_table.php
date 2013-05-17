@@ -14,11 +14,9 @@ class CreateLanguagesTable extends Migration {
 	{
 		Schema::create('languages', function(Blueprint $table)
 		{
-			$table->engine = 'MyISAM';
 			$table->increments('id');
-
-			$table->string('name');
-			$table->string('abbreviation');
+			$table->string('name')->index();
+			$table->string('abbreviation')->index();
 		});
 	}
 

@@ -60,11 +60,9 @@ class Page extends Eloquent {
 	public function getNameAttribute() {
 		return $this->currentRevision()->name;
 	}
-
 	public function getSlugAttribute() {
 		return $this->currentRevision()->slug;
 	}
-
 	public function getContentAttribute() {
 		return $this->currentRevision()->content;
 	}
