@@ -22,7 +22,7 @@ class Item extends Eloquent {
 	// accessors
 	public function currentRevision() {
 		if (is_null($this->_currentRevision))
-			$this->_currentRevision = $this->revisions()->collection()->first();
+			$this->_currentRevision = $this->revisions()->items()->first();
 		return $this->_currentRevision;
 	}
 	public function getNameAttribute() {

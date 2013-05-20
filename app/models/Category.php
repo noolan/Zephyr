@@ -9,19 +9,22 @@ class Category extends Eloquent {
 	private $_currentRevision = null;
 
 	public function revisions() {
-		return $this->morphMany('Revision', 'revised');
+		return $this->morphMany('Revision', 'revised')->orderBy('created_at', 'DESC');
 	}
 	public function items() {
 		return $this->hasMany('Item');
 	}
 	public function parent() {
-		return $this->belongsTo('Collection', 'parent_id');
+		return $this->belongsTo('Category', 'parent_id');
+	}
+	public function children() {
+		return $this->hasMany('Category', 'parent_id');
 	}
 
 	// accessors
 	public function currentRevision() {
 		if (is_null($this->_currentRevision))
-			$this->_currentRevision = $this->revisions()->collection()->first();
+			$this->_currentRevision = $this->revisions()->categories()->first();
 		return $this->_currentRevision;
 	}
 	public function getNameAttribute() {
@@ -31,24 +34,16 @@ class Category extends Eloquent {
 		return $this->currentRevision()->slug;
 	}
 
-	public static function findBySlug($slugs) {
-		$segments = explode('/', $slugs);
-		$category_id = 0;
-		foreach($segments as $key => $slug) {
-			if ($key < (count($segments) - 1))
-				$category_id = Revision::categories()->where('parent_id', $category_id)
-			                                       ->where('slug', $slug)
-		                                         ->first()->category_id;
-		  else
-		  	$revision = Revision::categories()->where('parent_id', $category_id)
-			                                    ->where('slug', $slug)
-		                                      ->first();
+	public static function findBySlug($slug) {
+		return Revision::categories()->where('slug', $slug)->first()->revised;
+	}
+
+	public function itemsByCollection() {
+		$items = array();
+		foreach ($this->items()->with('Collection')->orderBy('collection_id')->get() as $item) {
+			$items[$item->collection->item_name][$item->id] = $item;
 		}
-
-		if (!$revision)
-			App::abort(404, Lang::get('messages.404'));
-
-		return $revision->revised;
+		return $items;
 	}
 
 	public static function add($parameters) {
@@ -58,7 +53,7 @@ class Category extends Eloquent {
 			$category->revise(array(
 				'language_id' => Language::getId($language),
 				'name'        => $revision['name'],
-				'slug'        => $revision['item_name']
+				'slug'        => $revision['slug']
 			));
 		}
 
@@ -72,7 +67,7 @@ class Category extends Eloquent {
 			$sub_category->revise(array(
 				'language_id' => Language::getId($language),
 				'name'        => $revision['name'],
-				'slug'        => $revision['content']
+				'slug'        => $revision['slug']
 			));
 		}
 
@@ -83,5 +78,13 @@ class Category extends Eloquent {
 		$this->revisions()->save(new Revision($parameters));
 	}
 
+	public static function crumble($slug, $case = 'ucwords') {
+		$crumbs = array();
+		$breadcrumb = '';
+		foreach (explode('/', $slug) as $segment) {
+			$crumbs[$case(str_replace(array('-', '_'), ' ', $segment))] = ltrim($breadcrumb .= '/'.$segment, '/');
+		}
+		return $crumbs;
+	}
 
 }

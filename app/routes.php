@@ -74,38 +74,7 @@ Route::post('{lang}/page', function($lang) {
 
 /*
 |--------------------------------------------------------------------------
-| Edit Page by Slug Routes
-|--------------------------------------------------------------------------
-*/
-
-Route::get('{lang}/{page}', function($lang, $page) {
-	$page = Page::findBySlug($page);
-
-	if (Auth::check())
-		return View::make('page.edit')->with('title', $page->name)
-	                                ->with('page',  $page)
-	                                ->with('revisions', $page->revisions()->pages()->get());
-	else
-		return View::make('page.view')->with('title', $page->name)->with('page',  $page);
-});
-
-Route::post('{lang}/{page}', function($lang, $page) {
-	$page = Page::findBySlug($page);
-
-	$page->revise(array(
-		'language_id' => Input::get('language'),
-		'name'        => Input::get('name'),
-		'slug'        => Str::slug(Input::get('name')),
-		'content'     => Input::get('content')
-	));
-
-	return Redirect::to($lang.'/'.$page->slug);
-});
-
-
-/*
-|--------------------------------------------------------------------------
-| Edit Page by Id Routes
+| View/Edit Page by Id Routes
 |--------------------------------------------------------------------------
 */
 
@@ -117,13 +86,79 @@ Route::get('{lang}/page/{id}', function($lang, $id) {
 	                                ->with('page',  $page);
 	else
 		App::abort(404, Lang::get('messages.404'));
-});
+})->where('id', '[0-9]+');
 
 Route::post('{lang}/page/{id}', function($lang, $id) {
 	$page = Page::findOrFail($id);
 
 	$page->revise(array(
 		'language_id' => Input::get('language'),
+		'name'        => Input::get('name'),
+		'slug'        => Str::slug(Input::get('name')),
+		'content'     => Input::get('content')
+	));
+
+	return Redirect::to($lang.'/'.$page->slug);
+})->where('id', '[0-9]+');
+
+
+/*
+|--------------------------------------------------------------------------
+| View/Edit Page by Slug Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('{lang}/{segment1?}/{segment2?}/{segment3?}/{segment4?}/{segment5?}', function($lang, $segment1 = '', $segment2 = '', $segment3 = '', $segment4 = '', $segment5 = '') {
+	
+	$slug = rtrim($segment1.'/'.$segment2.'/'.$segment3.'/'.$segment4.'/'.$segment5, '/');
+	//var_dump($slug); die();
+	$revision = Revision::where('slug', $slug)->orderBy('created_at', 'DESC')->first();
+	if ($revision)
+		$resource = $revision->revised;
+	else
+		App::abort(404, Lang::get('messages.404'));
+
+	if (get_class($resource) == 'Page') {
+		if (Auth::check())
+			return View::make('page.edit')->with('title', $resource->name)
+		                                ->with('page',  $resource)
+		                                ->with('revisions', $resource->revisions()->pages()->get());
+		else
+			return View::make('page.view')->with('title', $resource->name)
+		                                ->with('page',  $resource);
+	} elseif (get_class($resource) == 'Category') {
+		$breadcrumbs = Category::crumble($slug, 'strtoupper');
+		end($breadcrumbs);
+		$active = key($breadcrumbs);
+		array_pop($breadcrumbs);
+
+		return View::make('category.view')->with('title', $resource->name)
+		                                  ->with('category', $resource)
+		                                  ->with('collections', $resource->itemsByCollection())
+		                                  ->with('sub_categories', $resource->children)
+		                                  ->with('breadcrumbs', $breadcrumbs)
+		                                  ->with('active', $active);
+	} elseif (get_class($resource) == 'Item') {
+		$breadcrumbs = Category::crumble($slug, 'strtoupper');
+		end($breadcrumbs);
+		$active = key($breadcrumbs);
+		array_pop($breadcrumbs);
+
+		return View::make('item.view')->with('title', $resource->name)
+		                              ->with('item', $resource)
+		                              ->with('breadcrumbs', $breadcrumbs)
+		                              ->with('active', $active);
+	}
+
+
+	
+});
+
+Route::post('{lang}/{page}', function($lang, $page) {
+	$page = Page::findBySlug($page);
+
+	$page->revise(array(
+		'language_id' => Language::getId(Input::get('language')),
 		'name'        => Input::get('name'),
 		'slug'        => Str::slug(Input::get('name')),
 		'content'     => Input::get('content')

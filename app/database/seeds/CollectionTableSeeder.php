@@ -5,7 +5,7 @@ class CollectionTableSeeder extends Seeder {
 	public function run() {
 		DB::table('collections')->delete();
 
-		Category::add(array(
+		Collection::add(array(
 		  'item_sort'   => Collection::SORT_CREATED_DESC,
 		  'type'        => Collection::DOCUMENT,
 			'revisions'   => array(

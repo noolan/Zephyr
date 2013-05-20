@@ -46,7 +46,7 @@ class Page extends Eloquent {
 		$revision = Revision::pages()->where('slug', $slug)
 		                             ->first();
 		if (!$revision)
-			App::abort(404, Lang::get('messages.404'));
+			return null;
 
 		return $revision->revised;
 	}
@@ -69,15 +69,16 @@ class Page extends Eloquent {
 
 	public static function add($parameters) {
 		$page = Page::create(array(
-			'order' => $parameters['order']
+			'order'       => $parameters['order'],
+			'category_id' => ThisOr::null('category', $parameters)
 		));
-		//var_dump($parameters); die();
+
 		foreach($parameters['revisions'] as $language => $revision) {
 			$page->revise(array(
 				'language_id' => Language::getId($language),
 				'name'        => $revision['name'],
 				'slug'        => $revision['slug'],
-				'content'     => $revision['content']
+				'content'     => ThisOr::null('content', $revision)
 			));
 		}
 		return $page;

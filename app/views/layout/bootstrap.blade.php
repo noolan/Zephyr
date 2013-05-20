@@ -96,25 +96,25 @@
       @section('content')
 
       <div class="page-header">
-        <h1>{{ $siteName }} <small>{{ $siteNameExtended }}</small></h1>
+        <h2>{{ $siteName }} <small>{{ $siteNameExtended }}</small></h2>
       </div>
 
       @if(Auth::check())
       <div class="row description">
-        <div class="span4">
+        <div class="col col-lg-4">
           Active Pages
         </div>
-        <div class="span1 pull-right">
+        <div class="col col-lg-1 pull-right">
           
         </div>
-        <div class="span2 pull-right" style="text-align:right; padding-right:32px;">
+        <div class="col col-lg-2 pull-right" style="text-align:right; padding-right:32px;">
           Unused Pages
         </div>
       </div>
       @endif
 
 
-      <ul class="nav nav-tabs">
+      <ul class="nav nav-tabs" style="margin-bottom:20px;">
         @foreach($links as $link)
         <li{{ ($link->slug == Request::segment(2)) ? ' class="active"' : '' }}>
           <a href="{{ URL::to(Language::current()->abbreviation.'/'.$link->slug) }}">{{ $link->name }}</a>

@@ -9,20 +9,35 @@ class PageTableSeeder extends Seeder {
 			'order'     => 1,
 			'revisions' => array(
 				'english' => array(
-					'name'        => 'Home',
-					'slug'        => 'home',
-					'content'     => 'Welcome to FNTC'
+					'name'    => 'Home',
+					'slug'    => 'home',
+					'content' => 'Welcome to FNTC'
 				),
 				'francais' => array(
-					'name'        => 'Accueil',
-					'slug'        => 'accueil',
-					'content'     => 'Bienvenue à la CFPN'
+					'name'    => 'Accueil',
+					'slug'    => 'accueil',
+					'content' => 'Bienvenue à la CFPN'
 				)
 			)
 		));
 
 		Page::add(array(
 			'order'     => 2,
+			'category'  => Category::findBySlug('framework')->id,
+			'revisions' => array(
+				'english' => array(
+					'name'    => 'Regulatory Framework',
+					'slug'    => 'framework'
+				),
+				'francais' => array(
+					'name'    => 'Cadre Réglementaire',
+					'slug'    => 'cadre'
+				)
+			)
+		));
+
+		Page::add(array(
+			'order'     => 3,
 			'revisions' => array(
 				'english' => array(
 					'name'        => 'Contract',
@@ -43,7 +58,7 @@ class PageTableSeeder extends Seeder {
 		));
 
 		Page::add(array(
-			'order'     => 3,
+			'order'     => 4,
 			'revisions' => array(
 				'francais' => array(
 					'name'        => 'Français Seulement',

@@ -6,6 +6,7 @@ $vendorDir = dirname(dirname(__FILE__));
 $baseDir = dirname($vendorDir);
 
 return array(
+    'AddCategoriesToItemsTable' => $baseDir . '/app/database/migrations/2013_05_05_193511_add_categories_to_items_table.php',
     'AddDefaultFieldToLanguages' => $baseDir . '/app/database/migrations/2013_04_27_225824_add_default_field_to_languages.php',
     'AddFieldsToRevisionsTable' => $baseDir . '/app/database/migrations/2013_05_05_185717_add_fields_to_revisions_table.php',
     'BaseController' => $baseDir . '/app/controllers/BaseController.php',
@@ -23,7 +24,6 @@ return array(
     'CreateUsersTable' => $baseDir . '/app/database/migrations/2013_04_22_231326_create_users_table.php',
     'DatabaseSeeder' => $baseDir . '/app/database/seeds/DatabaseSeeder.php',
     'HomeController' => $baseDir . '/app/controllers/HomeController.php',
-    'If' => $baseDir . '/app/libraries/If.php',
     'IlluminateQueueClosure' => $vendorDir . '/laravel/framework/src/Illuminate/Queue/IlluminateQueueClosure.php',
     'Item' => $baseDir . '/app/models/Item.php',
     'ItemTableSeeder' => $baseDir . '/app/database/seeds/ItemTableSeeder.php',
@@ -36,6 +36,7 @@ return array(
     'SessionHandlerInterface' => $vendorDir . '/symfony/http-foundation/Symfony/Component/HttpFoundation/Resources/stubs/SessionHandlerInterface.php',
     'Setting' => $baseDir . '/app/models/Setting.php',
     'SettingTableSeeder' => $baseDir . '/app/database/seeds/SettingTableSeeter.php',
+    'ThisOr' => $baseDir . '/app/libraries/ThisOr.php',
     'User' => $baseDir . '/app/models/User.php',
     'UserTableSeeder' => $baseDir . '/app/database/seeds/UserTableSeeder.php',
 );

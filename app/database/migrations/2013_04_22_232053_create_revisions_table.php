@@ -21,8 +21,8 @@ class CreateRevisionsTable extends Migration {
 			$table->integer('collection_id')->unsigned()->nullable()->index();
 			$table->integer('item_id')->unsigned()->nullable()->index();
 
-			$table->string('name')->index();
-			$table->text('content');
+			$table->string('name')->nullable()->index();
+			$table->text('content')->nullable();
 
 			$table->string('slug')->nullable()->index();
 			$table->string('item_name')->nullable();

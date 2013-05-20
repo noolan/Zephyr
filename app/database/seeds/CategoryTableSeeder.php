@@ -3,17 +3,17 @@
 class CategoryTableSeeder extends Seeder {
 
 	public function run() {
-		DB::table('category')->delete();
+		DB::table('categories')->delete();
 					
 		$framework = Category::add(array(
 			'revisions'   => array(
 				'english' => array(
 					'name' => 'Regulatory Framework',
-					'slug' => 'regulatory_framework'
+					'slug' => 'framework'
 				),
 				'francais' => array(
 					'name' => 'Cadre Réglementaire',
-					'slug' => 'cadre_reglementaire',
+					'slug' => 'cadre'
 				)
 			)
 		));
@@ -22,11 +22,11 @@ class CategoryTableSeeder extends Seeder {
 			'revisions'   => array(
 				'english' => array(
 					'name'      => 'FMA',
-					'slug'      => 'fma'
+					'slug'      => 'framework/fma'
 				),
 				'francais' => array(
 					'name'      => 'LGFPN',
-					'slug'      => 'lgfpn'
+					'slug'      => 'cadre/lgfpn'
 				)
 			)
 		));
@@ -34,11 +34,11 @@ class CategoryTableSeeder extends Seeder {
 			'revisions'   => array(
 				'english' => array(
 					'name'      => 'Legislation',
-					'slug'      => 'legislation'
+					'slug'      => 'framework/fma/legislation'
 				),
 				'francais' => array(
 					'name'      => 'Loi et Règlements',
-					'slug'      => 'loi-et-reglements'
+					'slug'      => 'cadre/lgfpn/loi-et-reglements'
 				)
 			)
 		));
@@ -46,11 +46,11 @@ class CategoryTableSeeder extends Seeder {
 			'revisions'   => array(
 				'english' => array(
 					'name'      => 'Regulations',
-					'slug'      => 'regulations'
+					'slug'      => 'framework/fma/regulations'
 				),
 				'francais' => array(
 					'name'      => 'Normes et procédures de la CFPN',
-					'slug'      => 'Normes-et-procédures-de-la-cpfn'
+					'slug'      => 'cadre/lgfpn/Normes-et-procédures-de-la-cpfn'
 				)
 			)
 		));
@@ -59,11 +59,11 @@ class CategoryTableSeeder extends Seeder {
 			'revisions'   => array(
 				'english' => array(
 					'name'      => 'Section 83',
-					'slug'      => 'section-83'
+					'slug'      => 'framework/section-83'
 				),
 				'francais' => array(
 					'name'      => 'Article 83',
-					'slug'      => 'article-83'
+					'slug'      => 'framewor/article-83'
 				)
 			)
 		));
@@ -71,11 +71,11 @@ class CategoryTableSeeder extends Seeder {
 			'revisions'   => array(
 				'english' => array(
 					'name'      => 'Legislation',
-					'slug'      => 'legislation'
+					'slug'      => 'framework/section-83/legislation'
 				),
 				'francais' => array(
 					'name'      => 'Loi et Règlements',
-					'slug'      => 'loi-et-reglements'
+					'slug'      => 'framewor/article-83/loi-et-reglements'
 				)
 			)
 		));
@@ -83,11 +83,11 @@ class CategoryTableSeeder extends Seeder {
 			'revisions'   => array(
 				'english' => array(
 					'name'      => 'Regulations',
-					'slug'      => 'regulations'
+					'slug'      => 'framework/section-83/regulations'
 				),
 				'francais' => array(
 					'name'      => 'Protocole d’entente',
-					'slug'      => 'protocole-d-entente'
+					'slug'      => 'framewor/article-83/protocole-d-entente'
 				)
 			)
 		));

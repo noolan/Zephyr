@@ -22,6 +22,17 @@ class Collection extends Eloquent {
 		5 => 'PICTURE'
 	);
 
+	public static $colors = array(
+	  1 => 'primary',
+	  2 => 'info',
+	  3 => 'success',
+	  4 => 'danger',
+	  5 => 'warning'
+	);
+	public function color() {
+		return self::$colors[$this->type];
+	}
+
 	const SORT_CREATED_ASC  = 'created_at ASC';
 	const SORT_CREATED_DESC = 'created_at DESC';
 	const SORT_NAME_ASC     = 'name ASC';
@@ -50,14 +61,11 @@ class Collection extends Eloquent {
 	// accessors
 	public function currentRevision() {
 		if (is_null($this->_currentRevision))
-			$this->_currentRevision = $this->revisions()->collection()->first();
+			$this->_currentRevision = $this->revisions()->collections()->first();
 		return $this->_currentRevision;
 	}
-	public function getNameAttribute() {
-		return $this->currentRevision()->name;
-	}
-	public function getContentAttribute() {
-		return $this->currentRevision()->content;
+	public function getItemNameAttribute() {
+		return $this->currentRevision()->item_name;
 	}
 
 	// crud
@@ -70,9 +78,7 @@ class Collection extends Eloquent {
 		foreach($parameters['revisions'] as $language => $revision) {
 			$collection->revise(array(
 				'language_id' => Language::getId($language),
-				'name'        => $revision['name'],
-				'item_name'   => $revision['item_name'],
-				'content'     => $revision['content']
+				'item_name'   => $revision['item_name']
 			));
 		}
 
@@ -84,15 +90,18 @@ class Collection extends Eloquent {
 	}
 
 	public function addItem($parameters) {
+		$category = Category::find($parameters['category']);
 		$item = Item::create(array(
 			'collection_id' => $this->id,
-			'category_id' => $parameters['category']
+			'category_id' => $category->id
 		));
 
 		foreach($parameters['revisions'] as $language => $revision) {
+			$language_id = Language::getId($language);
 			$item->revise(array(
-				'language_id' => Language::getId($language),
+				'language_id' => $language_id,
 				'name'        => $revision['name'],
+				'slug'        => $category->revisions()->where('language_id', $language_id)->first()->slug.'/'.$revision['slug'],
 				'content'     => $revision['content']
 			));
 		}

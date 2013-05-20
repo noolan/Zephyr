@@ -15,7 +15,7 @@ class CreatePagesTable extends Migration {
 		Schema::create('pages', function(Blueprint $table)
 		{
 			$table->increments('id');
-			$table->integer('collection_id')->unsigned()->nullable()->index();
+			$table->integer('category_id')->unsigned()->nullable()->index();
 			$table->integer('order')->default(0)->index();
 		});
 	}
