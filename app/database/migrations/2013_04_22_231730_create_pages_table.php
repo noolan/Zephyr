@@ -17,6 +17,8 @@ class CreatePagesTable extends Migration {
 			$table->increments('id');
 			$table->integer('category_id')->unsigned()->nullable()->index();
 			$table->integer('order')->default(0)->index();
+			$table->boolean('landing_page')->default(0);
+			$table->boolean('contact_page')->default(0);
 		});
 	}
 

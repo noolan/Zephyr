@@ -7,7 +7,6 @@
 	padding: 15px 0 0 0;
 }
 #form-actions {
-	text-align: right;
 	margin-bottom: 15px;
 }
 #content {
@@ -50,7 +49,7 @@
 							@endforeach
 						</select>
 					</div>
-					<div id="form-actions" class="col col-lg-4 pull-right">
+					<div id="form-actions" class="col col-lg-4 pull-right text-right">
 						<button type="submit" class=" btn btn-success save-button">save changes</button>
 						<button class="btn btn-warning cancel-button">cancel</button>
 					</div>
@@ -61,7 +60,7 @@
 						<input name="name" type="text" class="hide" placeholder="page title" value="{{ $revision->name }}">
 						<h2 style="margin:0;">{{ $revision->name }}</h3>
 					</div>
-					<div id="form-actions" class="col col-lg-4 pull-right">
+					<div id="form-actions" class="col col-lg-4 pull-right text-right">
 						<button type="submit" class=" btn btn-danger save-button">revert back to this version</button>
 					</div>
 					<div class="clearfix"></div>

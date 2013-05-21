@@ -6,7 +6,8 @@ class PageTableSeeder extends Seeder {
 		DB::table('pages')->delete();
 
 		Page::add(array(
-			'order'     => 1,
+			'order'        => 1,
+			'landing_page' => true,
 			'revisions' => array(
 				'english' => array(
 					'name'    => 'Home',
@@ -37,7 +38,8 @@ class PageTableSeeder extends Seeder {
 		));
 
 		Page::add(array(
-			'order'     => 3,
+			'order'        => 3,
+			'contact_page' => true,
 			'revisions' => array(
 				'english' => array(
 					'name'        => 'Contract',

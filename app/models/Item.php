@@ -31,6 +31,15 @@ class Item extends Eloquent {
 	public function getSlugAttribute() {
 		return $this->currentRevision()->slug;
 	}
+	public function getFilenameAttribute() {
+		return $this->currentRevision()->filename;
+	}
+	public function getStartAttribute() {
+		return $this->currentRevision()->start;
+	}
+	public function getEndAttribute() {
+		return $this->currentRevision()->end;
+	}
 	public function getContentAttribute() {
 		return $this->currentRevision()->content;
 	}

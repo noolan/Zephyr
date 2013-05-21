@@ -23,5 +23,39 @@ class ItemTableSeeder extends Seeder {
 			)
 		));
 
+	$bulletins = Collection::find(2);
+
+	$documents->addItem(array(
+		  'category'  => Category::findBySlug('bulletins')->id,
+			'revisions' => array(
+				'english' => array(
+					'name'     => '2013 Annual By-laws | Section 83',
+					'filename' => '/pdfs/somefile.pdf',
+					'start'    => '2013-04-17'
+				),
+				'francais' => array(
+					'name'     => 'Règlements administratifs annuels 2013 | Article 83',
+					'filename' => '/pdfs/somefile.pdf',
+					'start'    => '2013-04-17'
+				)
+			)
+		));
+
+	$documents->addItem(array(
+		  'category'  => Category::findBySlug('bulletins')->id,
+			'revisions' => array(
+				'english' => array(
+					'name'     => '2013 Annual By-laws | FMA',
+					'filename' => '/pdfs/somefile.pdf',
+					'start'    => '2013-04-09'
+				),
+				'francais' => array(
+					'name'    => 'Règlements administratifs annuels 2013 | LGFPN',
+					'filename' => '/pdfs/somefile.pdf',
+					'start'    => '2013-04-09'
+				)
+			)
+		));
+
 	}
 }

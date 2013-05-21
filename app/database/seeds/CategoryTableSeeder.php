@@ -92,5 +92,18 @@ class CategoryTableSeeder extends Seeder {
 			)
 		));
 
+		$bulletins = Category::add(array(
+			'revisions'   => array(
+				'english' => array(
+					'name' => 'Bulletins',
+					'slug' => 'bulletins'
+				),
+				'francais' => array(
+					'name' => 'Bulletins',
+					'slug' => 'bulletins'
+				)
+			)
+		));
+
 	}
 }

@@ -121,8 +121,15 @@ Route::get('{lang}/{segment1?}/{segment2?}/{segment3?}/{segment4?}/{segment5?}',
 	if (get_class($resource) == 'Page') {
 		if (Auth::check())
 			return View::make('page.edit')->with('title', $resource->name)
-		                                ->with('page',  $resource)
+		                                ->with('page', $resource)
 		                                ->with('revisions', $resource->revisions()->pages()->get());
+		elseif($resource->landing_page)
+			return View::make('page.landing')->with('title', $resource->name)
+		                                   ->with('page',  $resource)
+		                                   ->with('bulletins', Category::findBySlug('bulletins')->items);
+		elseif($resource->contact_page)
+			return View::make('page.contact')->with('title', $resource->name)
+		                                   ->with('page',  $resource);
 		else
 			return View::make('page.view')->with('title', $resource->name)
 		                                ->with('page',  $resource);

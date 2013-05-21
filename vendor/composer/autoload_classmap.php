@@ -37,6 +37,7 @@ return array(
     'Setting' => $baseDir . '/app/models/Setting.php',
     'SettingTableSeeder' => $baseDir . '/app/database/seeds/SettingTableSeeter.php',
     'ThisOr' => $baseDir . '/app/libraries/ThisOr.php',
+    'Time' => $baseDir . '/app/libraries/Time.php',
     'User' => $baseDir . '/app/models/User.php',
     'UserTableSeeder' => $baseDir . '/app/database/seeds/UserTableSeeder.php',
 );

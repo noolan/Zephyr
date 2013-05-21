@@ -69,8 +69,10 @@ class Page extends Eloquent {
 
 	public static function add($parameters) {
 		$page = Page::create(array(
-			'order'       => $parameters['order'],
-			'category_id' => ThisOr::null('category', $parameters)
+			'order'        => $parameters['order'],
+			'category_id'  => ThisOr::null('category', $parameters),
+			'landing_page' => ThisOr::false('landing_page', $parameters),
+			'contact_page' => ThisOr::false('contact_page', $parameters)
 		));
 
 		foreach($parameters['revisions'] as $language => $revision) {

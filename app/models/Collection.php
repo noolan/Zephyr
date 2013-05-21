@@ -98,11 +98,18 @@ class Collection extends Eloquent {
 
 		foreach($parameters['revisions'] as $language => $revision) {
 			$language_id = Language::getId($language);
+			$slug = null;
+			if (ThisOr::false('slug', $revision))
+				$slug = $category->revisions()->where('language_id', $language_id)->first()->slug.'/'.$revision['slug'];
+
 			$item->revise(array(
 				'language_id' => $language_id,
 				'name'        => $revision['name'],
-				'slug'        => $category->revisions()->where('language_id', $language_id)->first()->slug.'/'.$revision['slug'],
-				'content'     => $revision['content']
+				'slug'        => $slug,
+				'filename'    => ThisOr::null('filename', $revision),
+				'start'       => ThisOr::null('start', $revision),
+				'end'         => ThisOr::null('end', $revision),
+				'content'     => ThisOr::null('content', $revision)
 			));
 		}
 	}

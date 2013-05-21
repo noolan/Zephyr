@@ -17,6 +17,18 @@ class CollectionTableSeeder extends Seeder {
 				)
 			)
 		));
+		Collection::add(array(
+		  'item_sort'   => Collection::SORT_START_ASC,
+		  'type'        => Collection::NOTICE,
+			'revisions'   => array(
+				'english' => array(
+					'item_name' => 'bulletin'
+				),
+				'francais' => array(
+					'item_name' => 'bulletin'
+				)
+			)
+		));
 
 	}
 }
