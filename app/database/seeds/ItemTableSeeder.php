@@ -25,7 +25,7 @@ class ItemTableSeeder extends Seeder {
 
 	$bulletins = Collection::find(2);
 
-	$documents->addItem(array(
+	$bulletins->addItem(array(
 		  'category'  => Category::findBySlug('bulletins')->id,
 			'revisions' => array(
 				'english' => array(
@@ -41,7 +41,7 @@ class ItemTableSeeder extends Seeder {
 			)
 		));
 
-	$documents->addItem(array(
+	$bulletins->addItem(array(
 		  'category'  => Category::findBySlug('bulletins')->id,
 			'revisions' => array(
 				'english' => array(

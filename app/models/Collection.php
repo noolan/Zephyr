@@ -35,18 +35,10 @@ class Collection extends Eloquent {
 
 	const SORT_CREATED_ASC  = 'created_at ASC';
 	const SORT_CREATED_DESC = 'created_at DESC';
-	const SORT_NAME_ASC     = 'name ASC';
-	const SORT_NAME_DESC    = 'name DESC';
-	const SORT_START_ASC    = 'start ASC';
-	const SORT_START_DESC   = 'start DESC';
 
 	public static $item_sorts = array(
 	  'SORT_CREATED_ASC',
-	  'SORT_CREATED_DESC',
-	  'SORT_NAME_ASC',
-	  'SORT_NAME_DESC',
-	  'SORT_START_ASC',
-	  'SORT_START_DESC'
+	  'SORT_CREATED_DESC'
 	);
 
 	// relations
@@ -54,7 +46,12 @@ class Collection extends Eloquent {
 		return $this->morphMany('Revision', 'revised');
 	}
 	public function items() {
-		return $this->hasMany('Item')->orderBy(DB::raw($this->item_sort));
+		if (is_null($this->item_sort))
+			return $this->hasMany('Item');
+		else {
+			$sort = explode(' ', $this->item_sort);
+			return $this->hasMany('Item')->orderBy($sort[0], $sort[1]);
+		}
 	}
 	
 

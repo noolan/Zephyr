@@ -31,7 +31,7 @@ Route::post('{lang}/login', function($lang) {
 	$remember = (Input::get('password') == 'remember');
 
 	if (Auth::attempt($credentials, $remember))
-		return Redirect::to(Session::get('route', '/'));
+		return Redirect::to(Session::get('route', $lang.'/admin'));
 	else
 		return Redirect::to($lang.'/login')->withInput(Input::only('email', 'remember'))
 																->with('alert', 'error')
@@ -42,6 +42,13 @@ Route::get('{lang}/logout', function($lang) {
 	Auth::logout();
 	return Redirect::to($lang.'/login');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Admin Routes
+|--------------------------------------------------------------------------
+*/
+
 
 
 /*
@@ -100,6 +107,14 @@ Route::post('{lang}/page/{id}', function($lang, $id) {
 
 	return Redirect::to($lang.'/'.$page->slug);
 })->where('id', '[0-9]+');
+
+
+
+Route::get('{lang}/collections', function($lang) {
+	return View::make('collection.list')->with('title', 'Collections')
+	                                    ->with('collections', Collection::with('items')->get());
+});
+
 
 
 /*

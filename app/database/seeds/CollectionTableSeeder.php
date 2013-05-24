@@ -18,7 +18,7 @@ class CollectionTableSeeder extends Seeder {
 			)
 		));
 		Collection::add(array(
-		  'item_sort'   => Collection::SORT_START_ASC,
+		  'item_sort'   => Collection::SORT_CREATED_DESC,
 		  'type'        => Collection::NOTICE,
 			'revisions'   => array(
 				'english' => array(
